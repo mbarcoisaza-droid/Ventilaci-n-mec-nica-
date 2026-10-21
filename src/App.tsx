@@ -17,6 +17,7 @@ import type { ClinicalCase } from './cases/types';
 import { buildCase } from './cases/load';
 import { buildReport, snapshot, type Report, type Snapshot } from './cases/evaluate';
 import { interpret } from './education/interpret';
+import { canInstall, onInstallChange, promptInstall } from './pwa';
 
 type Tab = 'casos' | 'asincronias' | 'maniobras' | 'paciente' | 'teoria' | 'config';
 const TABS: [Tab, string][] = [
@@ -60,6 +61,9 @@ export default function App() {
   const [justification, setJustification] = useState('');
   const [report, setReport] = useState<Report | null>(null);
   const [customCases, setCustomCases] = useState<ClinicalCase[]>([]);
+
+  const [installable, setInstallable] = useState(canInstall());
+  useEffect(() => onInstallChange(() => setInstallable(canInstall())), []);
 
   const showModel = level < 3 && modelView;
   const showEff = level < 3 && showEfforts;
@@ -155,6 +159,11 @@ export default function App() {
           <h1>Ventilab</h1>
           <span className="tag">Simulador de ventilación mecánica invasiva</span>
         </div>
+        {installable && (
+          <button className="on" onClick={() => promptInstall()} title="Instalar Ventilab como aplicación en este equipo">
+            ⤓ Instalar app
+          </button>
+        )}
         <div className="group" role="group" aria-label="Nivel">
           <label>Nivel</label>
           {([1, 2, 3] as const).map((l) => (

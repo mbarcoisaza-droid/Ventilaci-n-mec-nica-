@@ -4,7 +4,19 @@ Aplicación web (React + TypeScript) para residentes de Medicina de Emergencias,
 
 > Herramienta educativa sin validación clínica formal. No debe usarse para decidir el tratamiento de pacientes reales.
 
-## Uso
+## Instalar como aplicación
+
+Ventilab es una aplicación web instalable (PWA): una vez instalada se abre en su propia ventana, con icono en el escritorio o en el menú Inicio, y funciona sin conexión.
+
+1. Abra https://mbarcoisaza-droid.github.io/ventilaci-n-mec-nica-/ en Chrome o Edge (Windows, macOS, Linux, Android).
+2. Pulse el botón **⤓ Instalar app** de la cabecera, o el icono de instalación de la barra de direcciones.
+3. En iPhone/iPad: Safari → Compartir → «Añadir a pantalla de inicio».
+
+La primera publicación requiere activar GitHub Pages una sola vez: *Settings → Pages → Build and deployment → Source: GitHub Actions*. A partir de ahí cada cambio en `main` se publica solo (el flujo ejecuta antes las pruebas).
+
+Alternativa sin instalación: `npm run build:single` genera `dist-single/index.html`, un único archivo que se abre con doble clic.
+
+## Uso para desarrollo
 
 ```bash
 npm install
