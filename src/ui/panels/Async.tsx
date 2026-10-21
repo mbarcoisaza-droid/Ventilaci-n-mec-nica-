@@ -130,6 +130,11 @@ export function AsyncPanel({ settings, patient, level, apply, events }: Props) {
               </div>
               {active === a.id && !hideNames && (
                 <>
+                  <div className={'note small' + (events[a.id] ? '' : ' warn')}>
+                    {events[a.id]
+                      ? `Detectada en el modelo: ${ASYNC_EVENT_LABEL[a.id]} ×${events[a.id]} en los últimos 60 s.`
+                      : 'Aún no detectada: espere unos ciclos (el detector usa la verdad del modelo).'}
+                  </div>
                   <div className="note small">Resolución propuesta: {a.resolve.text}</div>
                   <Detail a={a} revealName={false} />
                 </>

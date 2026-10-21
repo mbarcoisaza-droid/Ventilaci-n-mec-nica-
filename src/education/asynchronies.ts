@@ -110,7 +110,7 @@ export const ASYNCHRONIES: Asynchrony[] = [
     resolve: {
       phenotype: 'ardsMild',
       settings: { peakFlow: 40, flowPattern: 'decel', pause: 0.3 },
-      text: 'Flujo 60→40 L/min con rampa descendente y pausa 0.3 s: Ti mecánico ≈ 1.2 s (≈ Ti neural).',
+      text: 'Flujo 60→40 L/min con rampa descendente y pausa 0.3 s: Ti mecánico ≈ 1.3 s (≈ Ti neural). Observe el compromiso: con este impulso el flujo menor produce concavidad de Paw (flujo insuficiente); la alternativa es PCV con Ti ≈ 1.2 s o tratar el impulso.',
     },
   },
   {
@@ -155,13 +155,13 @@ export const ASYNCHRONIES: Asynchrony[] = [
     consequences: 'Aumento del trabajo isométrico, disconfort, progresión a esfuerzos inefectivos.',
     activate: {
       phenotype: 'copd',
-      effort: { pmusMax: 9, rr: 18, tiNeural: 0.9, chemoGain: 0 },
+      effort: { pmusMax: 13, rr: 18, tiNeural: 0.9, chemoGain: 0 },
       settings: { mode: 'VCV', rr: 16, vt: 500, peakFlow: 45, pause: 0, peep: 0, triggerType: 'pressure', pressureTrigger: 2.5 },
     },
     resolve: {
       phenotype: 'copd',
-      settings: { peep: 6, triggerType: 'flow', flowTrigger: 2, peakFlow: 55, flowPattern: 'decel', vt: 450 },
-      text: 'PEEP 0→6 (≈ 75 % de la auto-PEEP), disparo por flujo 2 L/min y Vt 500→450 mL. Ojo: acortar demasiado el Ti mecánico provocaría doble disparo.',
+      settings: { peep: 6, triggerType: 'flow', flowTrigger: 2, pause: 0.25 },
+      text: 'PEEP 0→6 (≈ 75 % de la auto-PEEP medida) y disparo por flujo 2 L/min: el umbral elástico baja y el ciclo arranca antes; pausa 0.25 s para que el Ti mecánico (≈ 0.9 s) siga al Ti neural y no aparezca doble disparo. Reducir la auto-PEEP (menos FR o Vt) también ayuda.',
     },
   },
   {
@@ -318,6 +318,10 @@ export const ASYNC_EVENT_LABEL: Record<string, string> = {
   prematureCycle: 'Ciclado prematuro',
   delayedCycle: 'Ciclado tardío',
   stacking: 'Breath stacking',
+  flowStarvation: 'Flujo insuficiente (VCV)',
+  flowExcess: 'Flujo excesivo / sobreimpulso',
+  flowAsync: 'Asincronía de flujo',
+  airTrapping: 'Atrapamiento aéreo (auto-PEEP)',
 };
 
 import { PHENOTYPES } from '../engine/presets';

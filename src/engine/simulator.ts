@@ -55,7 +55,11 @@ export interface AsyncEvent {
     | 'lateTrigger'
     | 'prematureCycle'
     | 'delayedCycle'
-    | 'stacking';
+    | 'stacking'
+    | 'flowStarvation'
+    | 'flowExcess'
+    | 'flowAsync'
+    | 'airTrapping';
 }
 
 interface BreathPlan {
@@ -97,6 +101,11 @@ interface Acc {
   peakExpFlow: number;
   inspEnd: number | null;
   cycleReason: string;
+  inspPmusSum: number; // suma de Pmus positiva durante la insuflación
+  inspN: number;
+  t90: number | null; // tiempo hasta alcanzar el 90 % de la presión objetivo
+  pawInspMax: number;
+  vcDip: number; // máxima caída de Paw durante una insuflación VC (concavidad por esfuerzo)
   s: number[]; // sumas para mínimos cuadrados (9 + 3 + 1)
 }
 
@@ -128,6 +137,11 @@ function newAcc(v: number): Acc {
     peakExpFlow: 0,
     inspEnd: null,
     cycleReason: '',
+    inspPmusSum: 0,
+    inspN: 0,
+    t90: null,
+    pawInspMax: -99,
+    vcDip: 0,
     s: new Array(13).fill(0),
   };
 }
@@ -561,6 +575,7 @@ export class Simulator {
       lsf,
       cycleReason: a.cycleReason,
     };
+    this.detectBreathAsync(rec, a);
     this.breaths.push(rec);
     if (this.breaths.length > 300) this.breaths.splice(0, 100);
     this.lastOverIndex = Math.min(1, a.pOverEI / 8);
@@ -576,6 +591,20 @@ export class Simulator {
       this.adaptiveP = Math.max(s.mode === 'VS' ? 2 : 5, Math.min(pmax, dpNow + step));
     }
     this.checkBreathAlarms(rec);
+  }
+
+  /** Asincronías de flujo y atrapamiento detectadas al cerrar cada ciclo (verdad del modelo). */
+  private detectBreathAsync(rec: BreathRecord, a: Acc) {
+    const meanPmus = a.inspN ? a.inspPmusSum / a.inspN : 0;
+    const dp = this.plan.level - this.plan.base;
+    const dipLimit = this.plan.pattern === 'square' ? 1.5 : 3;
+    if (rec.kind === 'VC' && meanPmus > 2 && a.vcDip > dipLimit) this.pushAsync('flowStarvation');
+    if ((rec.kind === 'PC' || rec.kind === 'PS') && dp >= 3) {
+      if (a.pawInspMax > this.plan.level + 1.5) this.pushAsync('flowExcess');
+      else if (meanPmus > 3 && (a.t90 === null || a.t90 > 0.3)) this.pushAsync('flowAsync');
+    }
+    if (rec.kind === 'VC' && rec.peakInspFlow > 90 && rec.ti < 0.5) this.pushAsync('flowExcess');
+    if (rec.kind !== 'APRV' && rec.te > 0.4 && rec.eef < -5 && rec.peepTotalModel - rec.peep > 2) this.pushAsync('airTrapping');
   }
 
   // ---------------------------------------------------------------- maniobras
@@ -840,6 +869,13 @@ export class Simulator {
     if (this.phase === 'insp' && lungFlow > 0) a.energy += paw * lungFlow * dt;
     if (lungFlow > 0 && pmus > 0) a.wob += pmus * lungFlow * dt;
     if (pmus > 0) a.ptp += pmus * dt;
+    if (this.phase === 'insp') {
+      a.inspPmusSum += Math.max(0, pmus);
+      a.inspN++;
+      if (this.kind === 'VC' && tIn > 0.08) a.vcDip = Math.max(a.vcDip, a.pawInspMax - paw);
+      if (paw > a.pawInspMax) a.pawInspMax = paw;
+      if (this.kind !== 'VC' && a.t90 === null && paw >= this.plan.base + 0.9 * (this.plan.level - this.plan.base)) a.t90 = tIn;
+    }
     if (pmus > a.pmusPeak) a.pmusPeak = pmus;
     const ppl = e.pCw - pmus;
     if (ppl > a.pplMax) a.pplMax = ppl;
@@ -1297,7 +1333,9 @@ export class Simulator {
     const ti = last ? last.ti : 0;
     const te = last ? last.te : 0;
     const ieRatio = ti > 0 ? te / ti : 0;
-    const asyncWin = this.asyncEvents.filter((a) => a.t > t - 60 && a.type !== 'stacking' && a.type !== 'reverse');
+    // índice de asincronía (Thille): disparo y ciclado; el flujo y el atrapamiento se informan aparte
+    const AI_TYPES = new Set(['double', 'autotrigger', 'lateTrigger', 'prematureCycle', 'delayedCycle']);
+    const asyncWin = this.asyncEvents.filter((a) => a.t > t - 60 && AI_TYPES.has(a.type));
     const effortsWin = this.drive.efforts.filter((e) => e.onset > t - 60 && e.onset < t - e.ti - 0.3);
     const ineff = this.aprvActive || !this.modeAllowsTrigger ? 0 : effortsWin.filter((e) => !e.triggered && !e.reverse).length;
     const spontEfforts = this.aprvActive ? this.drive.efforts.filter((e) => e.onset > t - 30).length * 2 : 0;
