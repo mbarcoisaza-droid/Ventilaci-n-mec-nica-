@@ -1,1 +1,49 @@
-# Ventilaci-n-mec-nica-
+# Ventilab · Simulador educativo de ventilación mecánica invasiva
+
+Aplicación web (React + TypeScript) para residentes de Medicina de Emergencias, Medicina Crítica y Anestesiología. Las curvas, los bucles y los valores numéricos se generan respiración a respiración a partir de un modelo fisiológico; no hay animaciones prediseñadas.
+
+> Herramienta educativa sin validación clínica formal. No debe usarse para decidir el tratamiento de pacientes reales.
+
+## Uso
+
+```bash
+npm install
+npm run dev          # servidor de desarrollo
+npm test             # pruebas de consistencia del motor y de los casos (vitest)
+npm run build        # compilación estándar en dist/
+npm run build:single # archivo HTML único en dist-single/
+```
+
+## Estructura
+
+```
+src/engine/        motor numérico independiente de la interfaz
+  types.ts         unidades, convenciones de signos, tipos
+  mechanics.ts     ecuación de movimiento: elastancia no lineal, reclutamiento, Rohrer,
+                   viscoelasticidad (Maxwell), limitación al flujo espiratorio
+  patient.ts       generador de Pmus (ritmo neural, disparo reverso, espiración activa/refleja)
+  simulator.ts     ventilador (10 modos), disparo/ciclado, maniobras, alarmas, monitor, registro 100 Hz
+  gas.ts           intercambio gaseoso y hemodinamia (compartimento único, dinámica acelerada)
+  presets.ts       fenotipos (sano, SDRA leve/moderado/grave, EPOC, asma, obesidad, neuromuscular,
+                   edema cardiogénico, alta demanda, P-SILI) y ajustes por defecto
+  pvcurve.ts       curva P-V cuasiestática
+  engine.test.ts   pruebas: conservación de volumen, unidades, equilibrio, integración flujo-volumen,
+                   R y C, espiración pasiva (τ), PEEP, Ti, auto-PEEP, cascada, fugas, maniobras, robustez
+src/education/     modos (taxonomía de Chatburn), 12 asincronías, lectura fisiológica en tiempo real
+src/cases/         11 casos clínicos serializables en JSON, evaluador no punitivo por rangos
+src/ui/            lienzos (curvas, bucles), monitor numérico, mandos, paneles docentes
+```
+
+## Modelo
+
+`Paw + Pmus = Pel(V) + R·V̇ + K2·V̇|V̇| + P2`
+
+- Presiones en cmH₂O relativas a la atmósfera; V̇ > 0 hacia el paciente; Pmus > 0 inspiratoria.
+- `Pel = PL,el + Pcw`; `Pcw = Ppl0 + Ecw·V`; `Ppl = Pcw − Pmus`; `PL = Palv − Ppl`.
+- `PL,el = −Ppl0 + (EL/r)·V + Kod·max(0, V − Vod·r)² + P2`, con `r` (fracción aireada) que evoluciona hacia una sigmoide de la PL (apertura rápida, cierre lento).
+- Limitación espiratoria: `V̇max = (PL,el − Pcrit)² / (Rus·5)`, independiente de Paw (efecto cascada).
+- Euler explícito a 500 Hz.
+
+Los esfuerzos inefectivos, el doble disparo, el breath stacking, el autodisparo por fuga, la auto-PEEP o el retiro de soporte en PRVC no están programados como eventos: aparecen al resolver la ecuación con la lógica de disparo y ciclado del ventilador.
+
+Simplificaciones principales: un compartimento (sin pendelluft ni heterogeneidad regional), reclutamiento global, sin compresibilidad del circuito, hemodinamia y PIC cualitativas, gasometría con dinámica acelerada. Las variables marcadas «modelo» (Pmus, Ppl, PL) equivalen a disponer de una presión esofágica ideal.

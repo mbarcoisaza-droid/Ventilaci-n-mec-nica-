@@ -1,0 +1,11 @@
+import { Simulator } from '../src/engine/simulator';
+import { PHENOTYPES, DEFAULT_SETTINGS, PASSIVE } from '../src/engine/presets';
+const cfg = JSON.parse(process.argv[2]);
+const p = { ...PHENOTYPES[cfg.ph], ...(cfg.p||{}), effort: { ...PHENOTYPES[cfg.ph].effort, ...(cfg.e||{}) } };
+const sim = new Simulator({ ...DEFAULT_SETTINGS, ...(cfg.s||{}) }, p);
+sim.advance(cfg.t || 40);
+const m = sim.monitor(); const g = sim.gasEx.gas;
+const ev: Record<string, number> = {};
+for (const a of sim.asyncEvents) if (a.t > sim.t - 30) ev[a.type] = (ev[a.type]||0)+1;
+const ineff = sim.drive.efforts.filter(e=>e.onset> sim.t-30 && e.onset < sim.t-2 && !e.triggered).length;
+console.log(JSON.stringify({ rr: m.rrTotal.toFixed(1), spont: m.rrSpont.toFixed(1), vte: m.vte.toFixed(0), ppk: m.ppeak.toFixed(1), ti: m.ti.toFixed(2), pmus: m.pmusModel.toFixed(1), p01: m.p01Model.toFixed(2), wob: m.wobJL.toFixed(2), paco2: g.paco2.toFixed(0), ph: g.ph.toFixed(2), ai: m.asyncIndex.toFixed(0), ev, ineff, efforts: sim.drive.efforts.filter(e=>e.onset>sim.t-30).length, cyc: sim.breaths.slice(-3).map(b=>b.cycleReason+':'+b.vte.toFixed(0)+':'+b.trigger) }));
