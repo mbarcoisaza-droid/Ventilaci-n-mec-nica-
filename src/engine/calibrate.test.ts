@@ -59,3 +59,23 @@ describe('asincronía observada en el paciente real', () => {
     expect(r.settings.vt).toBe(410);
   });
 });
+
+describe('¿el paciente asiste?', () => {
+  it('«Sí, asiste» en VC: el paciente dispara la mayoría de los ciclos', () => {
+    const r = calibrate({ ...ARDS, assisting: 'yes' });
+    expect(r.patient.effort.pmusMax).toBeGreaterThan(0);
+    expect(row(r, 'Ciclos disparados').model).toBeGreaterThan(60);
+  });
+  it('«No asiste»: paciente pasivo aunque haya P0.1', () => {
+    const r = calibrate({ ...ARDS, assisting: 'no', measured: { ...ARDS.measured, p01: 3 } });
+    expect(r.patient.effort.pmusMax).toBe(0);
+    expect(row(r, 'Ciclos disparados').model).toBe(0);
+  });
+});
+
+describe('asiste con FR total igual a la programada', () => {
+  it('el paciente dispara aunque la FR total medida coincida con la programada', () => {
+    const r = calibrate({ ...ARDS, assisting: 'yes', measured: { ...ARDS.measured, rrTotal: 24 } });
+    expect(row(r, 'Ciclos disparados').model).toBeGreaterThan(60);
+  });
+});

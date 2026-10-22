@@ -35,7 +35,7 @@ const EMPTY: Form = {
   ppeak: '', pplat: '', peepTotal: '', vte: '', rrTotal: '', rInsp: '', p01: '', pocc: '', pesEI: '', pesEE: '',
   map: '', hr: '', hb: '', icp: '',
   ph: '', paco2: '', pao2: '', hco3: '',
-  asyncType: 'none', asyncSeverity: 'frecuente',
+  asyncType: 'none', asyncSeverity: 'frecuente', assist: 'auto',
 };
 
 /** Ejemplo ficticio (no corresponde a ningún paciente real) */
@@ -98,6 +98,7 @@ function toInput(f: Form): { inp: RealPatientInput | null; errors: string[] } {
       measured: { ppeak: num(f.ppeak), pplat: num(f.pplat), peepTotal: num(f.peepTotal), vte: num(f.vte), rrTotal: num(f.rrTotal), rInsp: num(f.rInsp), p01: num(f.p01), pocc: num(f.pocc), pesEI: num(f.pesEI), pesEE: num(f.pesEE) },
       clinical: { map: num(f.map), hr: num(f.hr), hb: num(f.hb), icp: num(f.icp) },
       abg: { ph, paco2: num(f.paco2), pao2: num(f.pao2), hco3: num(f.hco3) },
+      assisting: (f.assist === 'yes' || f.assist === 'no' ? f.assist : 'auto') as 'auto' | 'yes' | 'no',
       asynchrony: f.asyncType && f.asyncType !== 'none' ? { type: f.asyncType, severity: (f.asyncSeverity || 'frecuente') as AsyncSeverity } : undefined,
     },
   };
@@ -242,6 +243,28 @@ export function RealPatientPanel({ onApply }: Props) {
             </>
           )}
         </div>
+      </fieldset>
+
+      <fieldset className="rp-sec">
+        <legend>¿El paciente asiste?</legend>
+        <div className="seg rp-seg" role="radiogroup" aria-label="¿El paciente asiste?">
+          {([
+            ['yes', 'Sí, asiste'],
+            ['no', 'No asiste'],
+            ['auto', 'Automático'],
+          ] as const).map(([v, l]) => (
+            <button key={v} role="radio" aria-checked={(f.assist || 'auto') === v} className={(f.assist || 'auto') === v ? 'active' : ''} onClick={() => set('assist')(v)}>
+              {l}
+            </button>
+          ))}
+        </div>
+        <p className="rp-hint" style={{ marginTop: 6 }}>
+          {(f.assist || 'auto') === 'yes'
+            ? 'El paciente dispara el ventilador: se modela su esfuerzo (con P0.1, ΔPocc o FR total si los conoce). Los ciclos que dispara se marcarán en morado.'
+            : (f.assist || 'auto') === 'no'
+              ? 'Paciente pasivo (sedado o relajado): sin esfuerzo inspiratorio; todos los ciclos los dispara el ventilador por tiempo.'
+              : 'Se deduce de los datos: asiste si el modo es espontáneo, si la FR total supera la programada o si hay P0.1/ΔPocc.'}
+        </p>
       </fieldset>
 
       <fieldset className="rp-sec">

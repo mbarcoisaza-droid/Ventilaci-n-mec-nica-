@@ -45,6 +45,8 @@ export interface RealPatientInput {
   abg: { ph?: number; paco2?: number; pao2?: number; hco3?: number };
   /** asincronía observada en el paciente real (opcional) */
   asynchrony?: { type: string; severity: AsyncSeverity };
+  /** ¿el paciente asiste (dispara el ventilador)? 'auto' = deducir de los datos */
+  assisting?: 'auto' | 'yes' | 'no';
 }
 
 export type AsyncSeverity = 'ocasional' | 'frecuente' | 'constante';
@@ -142,9 +144,28 @@ export function calibrate(inp: RealPatientInput): CalibrationResult {
   const m = inp.measured;
   const spontMode = ['PSV', 'CPAP', 'VS', 'BILEVEL', 'APRV'].includes(s.mode);
   const triggering = has(m.rrTotal) && m.rrTotal > s.rr + 2;
-  const active = spontMode || triggering || has(m.p01) || has(m.pocc);
+  const assisting = inp.assisting ?? 'auto';
+  const inferred = spontMode || triggering || has(m.p01) || has(m.pocc);
+  const active = assisting === 'yes' ? true : assisting === 'no' ? false : inferred;
+  if (assisting === 'no') {
+    if (spontMode) notes.push('Ha indicado que el paciente no asiste, pero el modo es espontáneo: sin esfuerzo no hay disparo y el ventilador pasará a la ventilación de respaldo por apnea.');
+    if (triggering) notes.push(`La FR total medida (${m.rrTotal}) supera la programada (${s.rr}), lo que sugiere que sí dispara; se respeta su indicación (paciente pasivo).`);
+    if (has(m.p01) || has(m.pocc)) notes.push('Con el paciente pasivo se ignoran P0.1 y ΔPocc.');
+  }
+  derived.push({ label: 'Estado del paciente', value: active ? `asiste (dispara el ventilador)${assisting === 'auto' ? ', deducido de los datos' : ''}` : `no asiste (pasivo)${assisting === 'auto' ? ', deducido de los datos' : ''}` });
   if (active) {
-    const rrN = has(m.rrTotal) ? clamp(m.rrTotal, 6, 45) : 18;
+    // si asiste en un modo controlado sin FR total medida, el ritmo neural supera ligeramente la FR programada
+    // en un modo controlado, para disparar el ventilador el ritmo neural debe superar la FR programada
+    // (en A/C cada disparo reinicia el temporizador del ciclo mandatorio)
+    let rrN = has(m.rrTotal) ? clamp(m.rrTotal, 6, 45) : spontMode ? 18 : clamp(s.rr + 3, 8, 45);
+    if (!spontMode && rrN <= s.rr + 2) {
+      rrN = clamp(s.rr + 3, 8, 45);
+      notes.push(
+        has(m.rrTotal)
+          ? `FR total igual a la programada: para que el paciente dispare se adelanta ligeramente su ritmo neural (${rrN}/min).`
+          : `Sin FR total medida se asume que el paciente dispara todos los ciclos (FR neural ${rrN}/min).`,
+      );
+    }
     const tiN = clamp((60 / rrN) * 0.38, 0.5, 1.4);
     let pmus = 6;
     if (has(m.pocc)) {
@@ -356,6 +377,7 @@ export function calibrate(inp: RealPatientInput): CalibrationResult {
     { label: 'pH', unit: '', measured: g.ph ?? null, model: 6.1 + Math.log10((p.hco3 + 0.1 * (paco2ss - p.co2Setpoint)) / (0.0307 * paco2ss)), digits: 2 },
     { label: 'PAM', unit: 'mmHg', measured: inp.clinical.map ?? null, model: gas.map, digits: 0 },
   ];
+  rows.push({ label: 'Ciclos disparados por el paciente', unit: '%', measured: null, model: mon.patientTriggeredPct, digits: 0 });
   if (has(inp.clinical.icp)) rows.push({ label: 'PIC', unit: 'mmHg', measured: inp.clinical.icp, model: gas.icp, digits: 0 });
   const ers = p.eL / Math.max(fin.sim.mech.r, 0.05) + p.eCW;
   derived.push(
