@@ -43,6 +43,7 @@ export interface Marker {
   trigger?: BreathTrigger;
   mandatory?: boolean;
   kind?: BreathKind;
+  tTrig?: number; // instante en que se cumplió el criterio de disparo del paciente
 }
 
 export interface AsyncEvent {
@@ -244,6 +245,7 @@ export class Simulator {
   breathStart = -10;
   nextMachine = 0.6;
   private trigPendingAt: number | null = null;
+  private trigDetectAt: number | null = null;
   private plan: BreathPlan;
   private peakFlowMeas = 0;
   adaptiveP = 12;
@@ -445,7 +447,9 @@ export class Simulator {
     this.dispVol = 0;
     this.peakFlowMeas = 0;
     this.acc = newAcc(this.mech.v);
-    this.markers.push({ t, type: 'inspStart', trigger, mandatory, kind });
+    const tTrig = trigger === 'patient' ? Math.min(t, this.trigDetectAt ?? t - TRIG_RESPONSE) : undefined;
+    this.markers.push({ t, type: 'inspStart', trigger, mandatory, kind, tTrig });
+    this.trigDetectAt = null;
     if (this.markers.length > 600) this.markers.splice(0, 200);
     if (mandatory && kind !== 'APRV') this.nextMachine = t + 60 / Math.max(1, this.settings.rr);
     if (trigger === 'machine' && mandatory) this.drive.onMachineBreath(t, this.patient.effort);
@@ -1094,7 +1098,10 @@ export class Simulator {
         s.triggerType === 'flow'
           ? this.flowMeas * 60 > s.flowTrigger
           : this.paw < base - s.pressureTrigger;
-      if (hit) this.trigPendingAt = this.t + TRIG_RESPONSE;
+      if (hit) {
+        this.trigPendingAt = this.t + TRIG_RESPONSE;
+        this.trigDetectAt = this.t;
+      }
       return false;
     }
     if (this.t >= this.trigPendingAt) {

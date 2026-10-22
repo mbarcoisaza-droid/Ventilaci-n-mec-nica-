@@ -82,19 +82,12 @@ export function Waveforms({ ctl, win, scales, showModel, showEfforts, frozen }: 
         }
       }
 
-      // inspiraciones disparadas por el paciente (asistidas): sombreado y franja morados
+      // ciclos disparados por el paciente: el tramo de disparo se colorea DENTRO de la curva
+      // (flujo en los modos por presión, presión en los modos por volumen)
       const starts = s.markers.filter((m) => m.type === 'inspStart');
-      const ends = s.markers.filter((m) => m.type === 'inspEnd');
-      const assisted: [number, number][] = [];
-      for (const m of starts) {
-        if (m.trigger !== 'patient') continue;
-        const e = ends.find((x) => x.t > m.t);
-        const tEndIns = e ? e.t : tEnd;
-        if (tEndIns < t0) continue;
-        assisted.push([Math.max(m.t, t0), Math.min(tEndIns, tEnd)]);
-      }
-      ctx.fillStyle = P.assistFill;
-      for (const [a, b] of assisted) ctx.fillRect(X(a), T, X(b) - X(a), rowH * 3);
+      const trigSegs = starts
+        .filter((m) => m.trigger === 'patient' && m.t > t0 - 0.5)
+        .map((m) => ({ a: m.tTrig ?? m.t - 0.04, b: m.t + 0.15, chan: m.kind === 'VC' ? 'paw' : 'flow' }));
 
       const chans: { key: 'paw' | 'flow' | 'vol'; buf: Float32Array; color: string; unit: string; label: string; zero: boolean }[] = [
         { key: 'paw', buf: s.bpaw, color: P.paw, unit: 'cmH₂O', label: 'Paw', zero: true },
@@ -154,7 +147,8 @@ export function Waveforms({ ctl, win, scales, showModel, showEfforts, frozen }: 
           ctx.moveTo(L, y);
           ctx.lineTo(L + pw, y);
           ctx.stroke();
-          ctx.fillText(String(Math.round(v * 10) / 10), L - 4, y);
+          // evitar que el rótulo extremo se superponga con el del panel vecino
+          if (y > y0 + 7 && y < y0 + rowH - 4) ctx.fillText(String(Math.round(v * 10) / 10), L - 4, y);
         }
         ctx.strokeStyle = P.line;
         ctx.strokeRect(L, y0, pw, rowH);
@@ -220,9 +214,33 @@ export function Waveforms({ ctl, win, scales, showModel, showEfforts, frozen }: 
           else ctx.lineTo(x, y);
         });
         ctx.stroke();
+        // tramo de disparo del paciente en morado
+        const segs = trigSegs.filter((g) => g.chan === c.key);
+        if (segs.length) {
+          ctx.strokeStyle = P.assist;
+          ctx.lineWidth = 3.2;
+          for (const g of segs) {
+            ctx.beginPath();
+            let started = false;
+            for (const i of idx) {
+              const tt = s.bt[i];
+              if (tt < g.a || tt > g.b) continue;
+              const x = X(tt);
+              const y = Y(c.buf[i]);
+              if (!started) {
+                ctx.moveTo(x, y);
+                started = true;
+              } else ctx.lineTo(x, y);
+            }
+            ctx.stroke();
+          }
+          ctx.lineWidth = 2;
+        }
         if (c.key === 'flow' || c.key === 'vol') {
           ctx.globalAlpha = 0.12;
           ctx.fillStyle = c.color;
+          ctx.beginPath();
+          idx.forEach((i, k) => (k ? ctx.lineTo(X(s.bt[i]), Y(c.buf[i])) : ctx.moveTo(X(s.bt[i]), Y(c.buf[i]))));
           ctx.lineTo(X(s.bt[idx[idx.length - 1]] ?? tEnd), Y(0));
           ctx.lineTo(X(s.bt[idx[0]] ?? t0), Y(0));
           ctx.closePath();
@@ -238,9 +256,6 @@ export function Waveforms({ ctl, win, scales, showModel, showEfforts, frozen }: 
         ctx.fillText(`${c.label} (${c.unit})`, L + 6, y0 + 4);
       });
 
-      // franja superior en el panel de presión durante las inspiraciones asistidas
-      ctx.fillStyle = P.assist;
-      for (const [a, b] of assisted) ctx.fillRect(X(a), T, Math.max(2, X(b) - X(a)), 4);
       // marcadores de inicio de ciclo: morado relleno = disparo del paciente; gris hueco = por tiempo
       for (const m of starts) {
         if (m.t < t0) continue;
@@ -254,14 +269,6 @@ export function Waveforms({ ctl, win, scales, showModel, showEfforts, frozen }: 
         if (pat) {
           ctx.fillStyle = P.assist;
           ctx.fill();
-          ctx.strokeStyle = P.assist;
-          ctx.lineWidth = 1;
-          ctx.beginPath();
-          ctx.moveTo(x, T);
-          ctx.lineTo(x, T + rowH * 3);
-          ctx.globalAlpha = 0.5;
-          ctx.stroke();
-          ctx.globalAlpha = 1;
         } else {
           ctx.strokeStyle = P.muted;
           ctx.lineWidth = 1;

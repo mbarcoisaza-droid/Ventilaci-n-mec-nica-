@@ -263,7 +263,7 @@ export default function App() {
                 <label className="chk"><input type="checkbox" checked={showEfforts} onChange={(e) => setShowEfforts(e.target.checked)} /> Esfuerzos</label>
               </>
             )}
-            <span className="assist-key">disparo del paciente (asistido)</span>
+            <span className="assist-key">tramo morado en la curva: disparo del paciente ({settings.mode === 'VCV' || settings.mode === 'SIMV_VC' ? 'presión' : 'flujo'})</span>
             <span className="panehint">clic: cursores A/B</span>
           </div>
           <Waveforms ctl={ctl} win={win} scales={scales} showModel={showModel} showEfforts={showEff} frozen={frozen} />
