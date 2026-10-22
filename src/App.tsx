@@ -20,9 +20,12 @@ import type { ClinicalCase } from './cases/types';
 import { buildCase } from './cases/load';
 import { buildReport, snapshot, type Report, type Snapshot } from './cases/evaluate';
 import { interpret } from './education/interpret';
+import { AsyncBanner, AsyncResolvePanel, type AssistActions } from './ui/AsyncAssistant';
+import type { FixPlan } from './education/fixAsync';
+import { injectAsynchrony, type AsyncSeverity } from './engine/calibrate';
 import { canInstall, onInstallChange, promptInstall } from './pwa';
 
-type Tab = 'real' | 'casos' | 'asincronias' | 'maniobras' | 'paciente' | 'lectura' | 'teoria' | 'config';
+type Tab = 'real' | 'casos' | 'resolver' | 'asincronias' | 'maniobras' | 'paciente' | 'lectura' | 'teoria' | 'config';
 // iconos de trazo simple (24×24)
 const TABS: [Tab, string, string][] = [
   ['real', 'Paciente real', 'M9 3h6M12 3v5M7 8h10l-1 13H8zM10 13h4M12 11v4'],
@@ -33,6 +36,7 @@ const TABS: [Tab, string, string][] = [
   ['lectura', 'Lectura', 'M4 5h16v11H8l-4 4zM8 9h8M8 12h5'],
   ['teoria', 'Modos', 'M4 6h16M4 12h16M4 18h10'],
   ['config', 'Guardar', 'M5 4h11l3 3v13H5zM8 4v5h7V4M8 20v-6h8v6'],
+  ['resolver', 'Resolver', 'M14 6a4 4 0 0 0 5 5l-8 8a2 2 0 0 1-3-3zM5 5l3 3'],
 ];
 
 const INIT_PATIENT = PHENOTYPES.ardsModerate;
@@ -68,6 +72,9 @@ export default function App() {
   const [report, setReport] = useState<Report | null>(null);
   const [customCases, setCustomCases] = useState<ClinicalCase[]>([]);
   const [confirmReset, setConfirmReset] = useState(false);
+  const [caseAsyncOpt, setCaseAsyncOpt] = useState<{ type: string; severity: AsyncSeverity } | null>(null);
+  const [undoStack, setUndoStack] = useState<{ settings: VentSettings; patient: PatientParams }[]>([]);
+  const [lastApplied, setLastApplied] = useState<{ name: string; what: string; t: number } | null>(null);
   const [panelKey, setPanelKey] = useState(0); // reinicia el estado interno de los módulos
 
   const [installable, setInstallable] = useState(canInstall());
@@ -115,8 +122,17 @@ export default function App() {
     [ctl],
   );
 
-  const loadCase = (c: ClinicalCase) => {
+  const loadCase = (c: ClinicalCase, asyncOpt?: { type: string; severity: AsyncSeverity } | null) => {
     const b = buildCase(c);
+    let caseAsync = null as null | { type: string; severity: AsyncSeverity };
+    if (asyncOpt && asyncOpt.type !== 'none') {
+      const inj = injectAsynchrony(b.patient, b.settings, asyncOpt.type, asyncOpt.severity, b.initPaco2);
+      b.patient = inj.patient;
+      caseAsync = asyncOpt;
+    }
+    setCaseAsyncOpt(caseAsync);
+    setUndoStack([]);
+    setLastApplied(null);
     ctl.replace(b.settings, b.patient, { initPaco2: b.initPaco2 }, 20);
     setSettingsState(b.settings);
     setPatientState(b.patient);
@@ -150,7 +166,7 @@ export default function App() {
   };
 
   const reset = () => {
-    if (activeCase) loadCase(activeCase);
+    if (activeCase) loadCase(activeCase, caseAsyncOpt);
     else {
       ctl.replace(settings, patient, {}, 4);
     }
@@ -177,6 +193,9 @@ export default function App() {
     setRunning(true);
     setPanelKey((k) => k + 1);
     setConfirmReset(false);
+    setUndoStack([]);
+    setLastApplied(null);
+    setCaseAsyncOpt(null);
     setTab('casos');
   };
 
@@ -195,6 +214,32 @@ export default function App() {
   const ineff = sim.drive.efforts.filter((e) => e.onset > sim.t - 60 && e.onset < sim.t - e.ti - 0.3 && !e.triggered && !e.reverse).length;
   if (sim.modeAllowsTrigger && ineff) events.ineffective = ineff;
   const notes = useMemo(() => (explain && level < 3 ? interpret(m, settings, g, sim.pbw) : []), [explain, level, m, settings, g, sim.pbw]);
+
+  const pushUndo = () => setUndoStack((u) => [...u.slice(-9), { settings: { ...ctl.sim.settings, alarms: { ...ctl.sim.settings.alarms } }, patient: { ...ctl.sim.patient, effort: { ...ctl.sim.patient.effort } } }]);
+  const assist: AssistActions = {
+    applyVent: (plan: FixPlan) => {
+      pushUndo();
+      setSettings(plan.settings);
+      setLastApplied({ name: plan.name, what: 'ajustes del ventilador', t: ctl.sim.t });
+    },
+    applyCause: (plan: FixPlan) => {
+      pushUndo();
+      setPatient(plan.patient);
+      setLastApplied({ name: plan.name, what: 'tratar la causa', t: ctl.sim.t });
+    },
+    undo: () => {
+      const last = undoStack[undoStack.length - 1];
+      if (!last) return;
+      ctl.sim.setPatient(last.patient);
+      ctl.sim.setSettings(last.settings);
+      setPatientState(last.patient);
+      setSettingsState(last.settings);
+      setUndoStack((u) => u.slice(0, -1));
+      setLastApplied(null);
+    },
+    canUndo: undoStack.length > 0,
+    lastApplied,
+  };
 
   const holdBusy = sim.pendingManeuver !== null || sim.phase === 'holdI' || sim.phase === 'holdE' || sim.phase === 'occl';
   const topAlarm = [...sim.alarms].sort((a, b) => (a.level === b.level ? 0 : a.level === 'high' ? -1 : 1));
@@ -308,6 +353,8 @@ export default function App() {
           </div>
           <Waveforms ctl={ctl} win={win} scales={scales} showModel={showModel} showEfforts={showEff} frozen={frozen} />
         </section>
+        <div className="midrow">
+        {level === 1 && <AsyncBanner ctl={ctl} actions={assist} onOpen={() => setTab('resolver')} />}
         {notes.length > 0 && (
           <button className="insight" onClick={() => setTab('lectura')} title="Ver toda la lectura fisiológica">
             <span className="insight-tag">Lectura</span>
@@ -315,6 +362,7 @@ export default function App() {
             {notes.length > 1 && <span className="insight-more">+{notes.length - 1}</span>}
           </button>
         )}
+        </div>
         <section className="pane looppane">
           <div className="panebar">
             <span className="panetitle">Bucles</span>
@@ -361,6 +409,7 @@ export default function App() {
                 justification={justification}
                 setJustification={setJustification}
                 onLoad={loadCase}
+              caseAsync={caseAsyncOpt}
                 onFinish={finishCase}
                 onExit={() => { setActiveCase(null); setReport(null); }}
                 customCases={customCases}
@@ -393,6 +442,12 @@ export default function App() {
               </div>
             )}
             {tab === 'teoria' && <TheoryPanel mode={settings.mode} />}
+            {tab === 'resolver' &&
+              (level === 1 ? (
+                <AsyncResolvePanel ctl={ctl} actions={assist} />
+              ) : (
+                <div className="note small">El asistente para resolver asincronías está disponible en el nivel Guiado. En los niveles Clínico y Experto identifique y corrija la asincronía usted mismo.</div>
+              ))}
             {tab === 'config' && <ConfigPanel settings={settings} patient={patient} apply={apply} csv={() => sim.toCSV(30)} />}
             <p className="disclaimer">Herramienta educativa basada en un modelo matemático simplificado, sin validación clínica formal. No usar para decidir el tratamiento de pacientes reales.</p>
           </div>

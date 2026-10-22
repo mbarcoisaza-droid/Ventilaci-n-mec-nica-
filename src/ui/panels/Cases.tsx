@@ -2,6 +2,23 @@ import { useRef, useState } from 'react';
 import { CASES } from '../../cases/cases';
 import type { ClinicalCase } from '../../cases/types';
 import { evalRule, type Snapshot } from '../../cases/evaluate';
+import { ASYNCHRONIES } from '../../education/asynchronies';
+import type { AsyncSeverity } from '../../engine/calibrate';
+
+/** asincronía sugerida para la variante «con asincronía» de cada caso */
+const SUGGESTED: Record<string, string> = {
+  'ards-severe': 'double',
+  copd: 'ineffective',
+  asthma: 'airTrapping',
+  'ards-async': 'stacking',
+  obese: 'flowStarvation',
+  weaning: 'ineffective',
+  tbi: 'autotrigger',
+  bpf: 'autotrigger',
+  metabolic: 'flowStarvation',
+  'pneumonia-hetero': 'reverse',
+  rv: 'airTrapping',
+};
 
 interface Props {
   active: ClinicalCase | null;
@@ -12,7 +29,8 @@ interface Props {
   setAnswer: (id: string, v: number) => void;
   justification: string;
   setJustification: (s: string) => void;
-  onLoad: (c: ClinicalCase) => void;
+  onLoad: (c: ClinicalCase, asyncOpt?: { type: string; severity: AsyncSeverity } | null) => void;
+  caseAsync?: { type: string; severity: AsyncSeverity } | null;
   onFinish: () => void;
   onExit: () => void;
   customCases: ClinicalCase[];
@@ -22,6 +40,8 @@ interface Props {
 export function CasesPanel(p: Props) {
   const [hintsShown, setHintsShown] = useState(0);
   const [jsonMsg, setJsonMsg] = useState('');
+  const [variant, setVariant] = useState<Record<string, { type: string; severity: AsyncSeverity }>>({});
+  const vOf = (id: string) => variant[id] ?? { type: 'none', severity: 'frecuente' as AsyncSeverity };
   const [jsonOut, setJsonOut] = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
   const c = p.active;
@@ -39,8 +59,37 @@ export function CasesPanel(p: Props) {
             <div className="item" key={x.id}>
               <span className="ttl">{x.title}</span>
               <span className="small muted">{x.subtitle}</span>
+              <div className="case-variant">
+                <label className="small" htmlFor={`cv-${x.id}`}>Asincronía</label>
+                <select
+                  id={`cv-${x.id}`}
+                  value={vOf(x.id).type}
+                  onChange={(e) => setVariant((v) => ({ ...v, [x.id]: { ...vOf(x.id), type: e.target.value } }))}
+                >
+                  <option value="none">Sin asincronía</option>
+                  {SUGGESTED[x.id] && (
+                    <option value={SUGGESTED[x.id]}>Con asincronía sugerida: {ASYNCHRONIES.find((a) => a.id === SUGGESTED[x.id])?.name}</option>
+                  )}
+                  <optgroup label="Otra asincronía">
+                    {ASYNCHRONIES.filter((a) => a.id !== SUGGESTED[x.id]).map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
+                  </optgroup>
+                </select>
+                {vOf(x.id).type !== 'none' && (
+                  <select
+                    aria-label="Frecuencia de la asincronía"
+                    value={vOf(x.id).severity}
+                    onChange={(e) => setVariant((v) => ({ ...v, [x.id]: { ...vOf(x.id), severity: e.target.value as AsyncSeverity } }))}
+                  >
+                    <option value="ocasional">ocasional</option>
+                    <option value="frecuente">frecuente</option>
+                    <option value="constante">casi siempre</option>
+                  </select>
+                )}
+              </div>
               <div className="row">
-                <button className="primary" onClick={() => { setHintsShown(0); p.onLoad(x); }}>Iniciar caso</button>
+                <button className="primary" onClick={() => { setHintsShown(0); p.onLoad(x, vOf(x.id).type === 'none' ? null : vOf(x.id)); }}>
+                  {vOf(x.id).type === 'none' ? 'Iniciar caso' : 'Iniciar con asincronía'}
+                </button>
                 <button onClick={() => setJsonOut(JSON.stringify(x, null, 2))}>Ver JSON</button>
               </div>
             </div>
@@ -93,6 +142,11 @@ export function CasesPanel(p: Props) {
           <button onClick={p.onExit}>Salir del caso</button>
         </div>
         <p className="small muted">{c.subtitle} · {Math.floor(p.elapsed / 60)}:{String(Math.floor(p.elapsed % 60)).padStart(2, '0')} min simulados</p>
+        {p.caseAsync && (
+          <div className="note warn small">
+            Variante con asincronía{p.level === 3 ? '' : `: ${ASYNCHRONIES.find((a) => a.id === p.caseAsync!.type)?.name} (${p.caseAsync.severity})`}. Identifíquela en las curvas{p.level === 1 ? ' o use el botón «Resolver»' : ''}.
+          </div>
+        )}
         <p>{c.story}</p>
       </div>
       <div className="sec">
