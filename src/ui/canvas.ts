@@ -250,3 +250,81 @@ export class ScaleKeeper {
     this.st.clear();
   }
 }
+
+/**
+ * Respuesta del transductor del monitor: filtro gaussiano centrado (fase cero) aplicado SÓLO a lo
+ * que se dibuja. Reproduce la dinámica de válvulas y sensores de un ventilador real (transiciones de
+ * 50–100 ms redondeadas) sin desplazar la señal en el tiempo. Fenómenos de ≥ 100 ms (muescas de
+ * disparo, esfuerzos, doble disparo) se conservan. En los bordes se renormaliza el núcleo.
+ */
+const kernels = new Map<number, Float64Array>();
+export function gaussSmooth(values: ArrayLike<number>, sigmaSamples: number): Float64Array {
+  const n = values.length;
+  const out = new Float64Array(n);
+  if (sigmaSamples <= 0.3) {
+    for (let i = 0; i < n; i++) out[i] = values[i];
+    return out;
+  }
+  let k = kernels.get(sigmaSamples);
+  const r = Math.ceil(sigmaSamples * 3);
+  if (!k) {
+    k = new Float64Array(2 * r + 1);
+    for (let j = -r; j <= r; j++) k[j + r] = Math.exp(-(j * j) / (2 * sigmaSamples * sigmaSamples));
+    kernels.set(sigmaSamples, k);
+  }
+  for (let i = 0; i < n; i++) {
+    let acc = 0;
+    let wsum = 0;
+    const a = Math.max(0, i - r);
+    const b = Math.min(n - 1, i + r);
+    for (let j = a; j <= b; j++) {
+      const w = k[j - i + r];
+      acc += w * values[j];
+      wsum += w;
+    }
+    out[i] = acc / wsum;
+  }
+  return out;
+}
+
+/**
+ * Igual que gaussSmooth, pero conserva los extremos clínicamente relevantes: en cada pico o valle
+ * local de la señal original (ventana ±3σ) el valor filtrado se lleva de nuevo al valor real con una
+ * transición gaussiana. Así la Ppico, el flujo pico o la muesca de disparo se ven a su altura real
+ * mientras las esquinas quedan redondeadas.
+ */
+export function smoothKeepExtrema(values: ArrayLike<number>, sigmaSamples: number, minProminence = 2): Float64Array {
+  const out = gaussSmooth(values, sigmaSamples);
+  const n = values.length;
+  const r = Math.max(1, Math.ceil(sigmaSamples * 3));
+  for (let i = 1; i < n - 1; i++) {
+    const v = values[i];
+    let isMax = true;
+    let isMin = true;
+    let lo = v;
+    let hi = v;
+    const a = Math.max(0, i - r);
+    const b = Math.min(n - 1, i + r);
+    for (let j = a; j <= b; j++) {
+      const x = values[j];
+      if (x > v) isMax = false;
+      if (x < v) isMin = false;
+      if (x < lo) lo = x;
+      if (x > hi) hi = x;
+    }
+    if (isMax === isMin) continue; // meseta plana o punto intermedio
+    // sólo extremos con prominencia relevante (evita «ganchos» en tramos casi planos)
+    const prominence = isMax ? v - lo : hi - v;
+    if (prominence < minProminence) continue;
+    const delta = v - out[i];
+    if (Math.abs(delta) < 0.2) continue;
+    // reparte la corrección con una campana estrecha centrada en el extremo
+    const rr = Math.max(1, Math.round(sigmaSamples * 3));
+    for (let j = Math.max(0, i - rr); j <= Math.min(n - 1, i + rr); j++) {
+      const w = Math.exp(-((j - i) * (j - i)) / (2 * (sigmaSamples * 1.1) ** 2));
+      const target = out[j] + delta * w;
+      out[j] = isMax ? Math.min(Math.max(out[j], target), v) : Math.max(Math.min(out[j], target), v);
+    }
+  }
+  return out;
+}

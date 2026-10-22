@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { Controller } from './controller';
-import { autoRange, cssVar, glowStroke, niceStep, palette, ScaleKeeper, useCanvas } from './canvas';
+import { autoRange, cssVar, gaussSmooth, glowStroke, smoothKeepExtrema, niceStep, palette, ScaleKeeper, useCanvas } from './canvas';
 import type { FrozenTrace, ScaleSet } from './Waveforms';
 
 /**
@@ -63,6 +63,12 @@ export function SweepWaveforms({ ctl, win, scales, showModel, showEfforts, froze
       const X = (t: number) => L + (pos(t) / win) * pw;
       const visible = (t: number) => t > now - win + gap && t <= now;
       const idx = s.window(win - gap);
+      // señal tal como la mostraría el transductor de un ventilador real (σ ≈ 40 ms; registro a 100 Hz)
+      const shown = {
+        paw: smoothKeepExtrema(Array.from(idx, (i) => s.bpaw[i]), 3.5, 1.5), // cmH₂O
+        flow: smoothKeepExtrema(Array.from(idx, (i) => s.bflow[i]), 3.5, 5), // L/min
+        vol: gaussSmooth(Array.from(idx, (i) => s.bvol[i]), 2.5),
+      };
 
       ctx.fillStyle = M.bg;
       ctx.fillRect(0, 0, w, h);
@@ -185,12 +191,12 @@ export function SweepWaveforms({ ctl, win, scales, showModel, showEfforts, froze
           ctx.setLineDash([]);
         }
         // tramos continuos del barrido (se cortan en el hueco de borrado y al volver al inicio)
-        const trace = (buf: Float32Array, color: string, width: number, dash: number[] = [], range?: [number, number], glow = true) => {
+        const trace = (vals: ArrayLike<number>, color: string, width: number, dash: number[] = [], range?: [number, number], glow = true) => {
           const pieces: { xs: number[]; ys: number[] }[] = [];
           let cur: { xs: number[]; ys: number[] } | null = null;
           let prevPos = -1;
-          for (const i of idx) {
-            const tt = s.bt[i];
+          for (let k = 0; k < idx.length; k++) {
+            const tt = s.bt[idx[k]];
             if (!visible(tt) || (range && (tt < range[0] || tt > range[1]))) {
               cur = null;
               continue;
@@ -201,17 +207,17 @@ export function SweepWaveforms({ ctl, win, scales, showModel, showEfforts, froze
               pieces.push(cur);
             }
             cur.xs.push(L + (p / win) * pw);
-            cur.ys.push(Y(buf[i]));
+            cur.ys.push(Y(vals[k]));
             prevPos = p;
           }
           glowStroke(ctx, pieces, color, width, dash, glow);
         };
         if (showModel && c.key === 'paw') {
-          trace(s.bpmus, P.pmus, 1.3, [5, 3], undefined, false);
-          trace(s.bppl, P.ptp, 1.3, [5, 3], undefined, false);
+          trace(Array.from(idx, (i) => s.bpmus[i]), P.pmus, 1.3, [5, 3], undefined, false);
+          trace(Array.from(idx, (i) => s.bppl[i]), P.ptp, 1.3, [5, 3], undefined, false);
         }
-        trace(c.buf, c.color, 2.2);
-        for (const sg of trigSegs) if (sg.chan === c.key) trace(c.buf, P.assist, 3.4, [], [sg.a, sg.b]);
+        trace(shown[c.key], c.color, 2.2);
+        for (const sg of trigSegs) if (sg.chan === c.key) trace(shown[c.key], P.assist, 3.4, [], [sg.a, sg.b]);
         ctx.restore();
       });
 
