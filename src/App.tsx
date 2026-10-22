@@ -12,6 +12,8 @@ import { CasesPanel } from './ui/panels/Cases';
 import { TheoryPanel } from './ui/panels/Theory';
 import { ConfigPanel } from './ui/panels/Config';
 import { ReportView } from './ui/panels/Report';
+import { RealPatientPanel } from './ui/panels/RealPatient';
+import type { CalibrationResult } from './engine/calibrate';
 import { DEFAULT_SETTINGS, PHENOTYPES } from './engine/presets';
 import type { PatientParams, VentSettings } from './engine/types';
 import type { ClinicalCase } from './cases/types';
@@ -20,9 +22,10 @@ import { buildReport, snapshot, type Report, type Snapshot } from './cases/evalu
 import { interpret } from './education/interpret';
 import { canInstall, onInstallChange, promptInstall } from './pwa';
 
-type Tab = 'casos' | 'asincronias' | 'maniobras' | 'paciente' | 'lectura' | 'teoria' | 'config';
+type Tab = 'real' | 'casos' | 'asincronias' | 'maniobras' | 'paciente' | 'lectura' | 'teoria' | 'config';
 // iconos de trazo simple (24×24)
 const TABS: [Tab, string, string][] = [
+  ['real', 'Paciente real', 'M9 3h6M12 3v5M7 8h10l-1 13H8zM10 13h4M12 11v4'],
   ['casos', 'Casos', 'M6 3h9l3 3v15H6zM9 9h6M9 13h6M9 17h4'],
   ['asincronias', 'Asincronías', 'M2 14h4l2-7 3 12 2-8 2 3h7'],
   ['maniobras', 'Maniobras', 'M3 17l5-9 3 6h4M19 6v12M15 6v12'],
@@ -120,6 +123,18 @@ export default function App() {
     setInitialSnap(snapshot(ctl.sim));
     setAnswers({});
     setJustification('');
+    setFrozen(null);
+    setFrozenLoop(null);
+    ctl.running = true;
+    setRunning(true);
+  };
+
+  const loadRealPatient = (r: CalibrationResult) => {
+    ctl.replace(r.settings, r.patient, { initPaco2: r.initPaco2 }, 15);
+    setSettingsState(r.settings);
+    setPatientState(r.patient);
+    setActiveCase(null);
+    setReport(null);
     setFrozen(null);
     setFrozenLoop(null);
     ctl.running = true;
@@ -284,6 +299,7 @@ export default function App() {
             <button onClick={() => setTab(null)} aria-label="Cerrar panel">✕</button>
           </div>
           <div className="drawer-body">
+            {tab === 'real' && <RealPatientPanel onApply={loadRealPatient} />}
             {tab === 'casos' && (
               <CasesPanel
                 active={activeCase}

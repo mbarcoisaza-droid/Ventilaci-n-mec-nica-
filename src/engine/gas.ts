@@ -34,6 +34,16 @@ export function po2FromContent(c: number, hb: number): number {
   return (lo + hi) / 2;
 }
 
+/** PaO2 en equilibrio: gas alveolar + componente V/Q bajo + mezcla venosa por shunt. */
+export function pao2Model(fio2: number, paco2: number, vqGradient: number, hb: number, vo2: number, co: number, shunt: number): number {
+  const pao2Alv = Math.max(20, fio2 * 713 - paco2 / 0.8);
+  const pc = Math.max(20, pao2Alv - vqGradient * (0.21 / fio2));
+  const cc = o2Content(pc, hb);
+  const avd = Math.min(12, vo2 / (Math.max(co, 0.8) * 10));
+  const ca = Math.max(2, cc - (shunt * avd) / Math.max(0.05, 1 - shunt));
+  return po2FromContent(ca, hb);
+}
+
 export interface GasInputs {
   fio2: number;
   rNorm: number; // fracción del pulmón reclutable que está abierta (0–1)
@@ -122,12 +132,7 @@ export class GasExchange {
     // oxigenación
     const shunt = Math.min(0.75, p.shuntMin + (p.shuntMax - p.shuntMin) * (1 - inp.rNorm) + 0.05 * inp.overIndex);
     g.shunt = shunt;
-    const pao2Alv = Math.max(20, inp.fio2 * 713 - g.paco2 / 0.8);
-    const pc = Math.max(20, pao2Alv - p.vqGradient * (0.21 / inp.fio2));
-    const cc = o2Content(pc, p.hb);
-    const avd = Math.min(12, p.vo2 / (Math.max(g.co, 0.8) * 10));
-    const ca = Math.max(2, cc - (shunt * avd) / Math.max(0.05, 1 - shunt));
-    const pao2 = po2FromContent(ca, p.hb);
+    const pao2 = pao2Model(inp.fio2, g.paco2, p.vqGradient, p.hb, p.vo2, g.co, shunt);
     if (elapsed > 2) g.pao2 += ((pao2 - g.pao2) * dt) / this.tauO2;
     else g.pao2 = pao2;
     g.sao2 = satFromPo2(g.pao2);
