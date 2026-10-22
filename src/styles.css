@@ -26,6 +26,13 @@
   --insp: rgba(79, 179, 255, 0.06);
   --grid: rgba(141, 156, 168, 0.13);
   --ref: rgba(231, 238, 242, 0.38);
+  /* estilo «monitor» de las curvas */
+  --mon-bg: #000000;
+  --mon-axis: #d9d9d9;
+  --mon-text: #e8e8e8;
+  --mon-paw: #ffe14a;
+  --mon-flow: #ff3ea5;
+  --mon-vol: #55d0ff;
   --f-ui: 'Barlow Semi Condensed', 'Arial Narrow', system-ui, sans-serif;
   --f-num: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
   color-scheme: dark;
@@ -118,6 +125,8 @@ h1, h2, h3, h4 { margin: 0; text-wrap: balance; }
 .collapse-btn svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; transition: transform 0.15s; }
 .collapse-btn svg.rot { transform: rotate(-90deg); }
 .loops-collapsed .looppane .panebar { border-bottom: none; }
+.wavepane.is-monitor { background: var(--mon-bg); }
+.wavepane.is-monitor .panebar { background: var(--panel); border-radius: 8px 8px 0 0; }
 .midrow { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .asyncbanner { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; background: color-mix(in srgb, var(--warn) 14%, var(--panel)); border: 1px solid var(--warn); border-radius: 8px; padding: 5px 8px; font-size: 13.5px; }
 .asyncbanner.ok { background: color-mix(in srgb, var(--ok) 12%, var(--panel)); border-color: var(--ok); }

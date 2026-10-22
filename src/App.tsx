@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Controller } from './ui/controller';
 import { Waveforms, captureTrace, type FrozenTrace, type ScaleSet } from './ui/Waveforms';
+import { SweepWaveforms } from './ui/SweepWaveforms';
 import { Loops, breathLoops, type FrozenLoop } from './ui/Loops';
 import { Values } from './ui/Numeric';
 import { TherapyBar } from './ui/TherapyBar';
@@ -72,6 +73,21 @@ export default function App() {
   const [report, setReport] = useState<Report | null>(null);
   const [customCases, setCustomCases] = useState<ClinicalCase[]>([]);
   const [confirmReset, setConfirmReset] = useState(false);
+  const [waveStyle, setWaveStyle] = useState<'monitor' | 'console'>(() => {
+    try {
+      return localStorage.getItem('vmsim-wave-style') === 'console' ? 'console' : 'monitor';
+    } catch {
+      return 'monitor';
+    }
+  });
+  const changeWaveStyle = (v: 'monitor' | 'console') => {
+    setWaveStyle(v);
+    try {
+      localStorage.setItem('vmsim-wave-style', v);
+    } catch {
+      /* sin almacenamiento */
+    }
+  };
   const [loopsOpen, setLoopsOpen] = useState<boolean>(() => {
     try {
       return localStorage.getItem('vmsim-loops-open') !== '0';
@@ -342,7 +358,7 @@ export default function App() {
       </nav>
 
       <main className={'center' + (loopsOpen ? '' : ' loops-collapsed')}>
-        <section className="pane wavepane">
+        <section className={'pane wavepane' + (waveStyle === 'monitor' ? ' is-monitor' : '')}>
           <div className="panebar">
             <select aria-label="Ventana de tiempo" value={win} onChange={(e) => setWin(parseFloat(e.target.value))}>
               {[6, 12, 20, 30, 60].map((v) => <option key={v} value={v}>{v} s</option>)}
@@ -356,6 +372,10 @@ export default function App() {
             <select aria-label="Escala de volumen" value={scales.vol} onChange={(e) => setScales({ ...scales, vol: +e.target.value })}>
               {[0, 300, 600, 900, 1200, 2000].map((v) => <option key={v} value={v}>{v ? `Vol ${v}` : 'Vol auto'}</option>)}
             </select>
+            <select aria-label="Estilo de las curvas" value={waveStyle} onChange={(e) => changeWaveStyle(e.target.value as 'monitor' | 'console')}>
+              <option value="monitor">Monitor</option>
+              <option value="console">Consola</option>
+            </select>
             <button onClick={freeze}>Congelar</button>
             {frozen && <button onClick={() => { setFrozen(null); setFrozenLoop(null); }}>Quitar ref.</button>}
             {level < 3 && (
@@ -364,10 +384,14 @@ export default function App() {
                 <label className="chk"><input type="checkbox" checked={showEfforts} onChange={(e) => setShowEfforts(e.target.checked)} /> Esfuerzos</label>
               </>
             )}
-            <span className="assist-key">tramo morado en la curva: disparo del paciente ({settings.mode === 'VCV' || settings.mode === 'SIMV_VC' ? 'presión' : 'flujo'})</span>
+            <span className="assist-key">disparo del paciente ({settings.mode === 'VCV' || settings.mode === 'SIMV_VC' ? 'presión' : 'flujo'})</span>
             <span className="panehint">clic: cursores A/B</span>
           </div>
-          <Waveforms ctl={ctl} win={win} scales={scales} showModel={showModel} showEfforts={showEff} frozen={frozen} />
+          {waveStyle === 'monitor' ? (
+            <SweepWaveforms ctl={ctl} win={win} scales={scales} showModel={showModel} showEfforts={showEff} frozen={frozen} />
+          ) : (
+            <Waveforms ctl={ctl} win={win} scales={scales} showModel={showModel} showEfforts={showEff} frozen={frozen} />
+          )}
         </section>
         <div className="midrow">
         {level === 1 && <AsyncBanner ctl={ctl} actions={assist} onOpen={() => setTab('resolver')} />}

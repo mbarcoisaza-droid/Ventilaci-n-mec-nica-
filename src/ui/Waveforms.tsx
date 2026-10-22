@@ -4,6 +4,7 @@ import { autoRange, niceStep, palette, useCanvas } from './canvas';
 
 export interface FrozenTrace {
   label: string;
+  t0: number; // instante absoluto del inicio de la ventana capturada
   t: number[]; // relativo al inicio de la ventana
   paw: number[];
   flow: number[];
@@ -31,6 +32,7 @@ export function captureTrace(ctl: Controller, win: number, label: string): Froze
   const t0 = s.t - win;
   return {
     label,
+    t0,
     t: idx.map((i) => s.bt[i] - t0),
     paw: idx.map((i) => s.bpaw[i]),
     flow: idx.map((i) => s.bflow[i]),
