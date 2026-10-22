@@ -30,7 +30,7 @@ export function AsyncBanner({ ctl, actions, onOpen }: { ctl: Controller; actions
     <div className="asyncbanner" role="status">
       <span className="ab-tag">Asincronía</span>
       <span className="ab-text">
-        <b>{plan.name}</b> · {dom!.count} en 20 s
+        <b>{plan.name}</b> · {dom!.count} en 20 s · sincronía <span className="ab-sync">{sim.syncStats(30, 10).pct} %</span>
       </span>
       <button className="ab-main" onClick={() => actions.applyVent(plan)}>Resolver en el ventilador</button>
       {plan.patientSteps.length > 0 && <button onClick={() => actions.applyCause(plan)}>Tratar la causa</button>}

@@ -302,3 +302,28 @@ fieldset.item { min-width: 0; }
   .knobpanel { width: 100%; }
 }
 @media (prefers-reduced-motion: reduce) { .collapse-btn svg { transition: none; } }
+
+/* sincronía paciente-ventilador (laboratorio de asincronías) */
+.syncmeter { background: var(--raised2); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; display: flex; flex-direction: column; gap: 5px; --sm: var(--muted); }
+.syncmeter.bad { --sm: var(--crit); }
+.syncmeter.mid { --sm: var(--warn); }
+.syncmeter.ok { --sm: var(--ok); }
+.sm-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.sm-title { font-weight: 700; font-size: 13px; }
+.sm-val { font-family: var(--f-num); font-size: 24px; font-weight: 700; color: var(--sm); font-variant-numeric: tabular-nums; }
+.sm-bar { height: 8px; border-radius: 4px; background: var(--line); overflow: hidden; }
+.sm-fill { height: 100%; background: var(--sm); border-radius: 4px; transition: width 0.6s ease; }
+.sync-history { display: flex; flex-wrap: wrap; gap: 4px; margin: 6px 0; }
+.sh-chip { border: 1px solid var(--line); border-radius: 999px; padding: 1px 8px; background: var(--raised); }
+.sh-chip.now { border-color: var(--accent); }
+.steps-res { list-style: none; margin: 4px 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.steps-res li { display: flex; align-items: flex-start; gap: 8px; padding: 5px 6px; border-radius: 6px; border: 1px solid transparent; }
+.steps-res li.sr-next { border-color: var(--accent); background: var(--raised); }
+.steps-res li.sr-done { opacity: 0.75; }
+.steps-res li.sr-todo { opacity: 0.6; }
+.sr-mark { flex: none; width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center; font-size: 12px; font-weight: 700; background: var(--line); }
+.sr-done .sr-mark { background: var(--ok); color: var(--bg); }
+.sr-next .sr-mark { background: var(--accent); color: var(--bg); }
+.sr-body { flex: 1; min-width: 0; }
+.steps-res button { flex: none; }
+.ab-sync { font-family: var(--f-num); font-weight: 700; }

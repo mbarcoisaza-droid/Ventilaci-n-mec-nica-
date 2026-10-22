@@ -22,6 +22,15 @@ export interface Asynchrony {
   resolve: AsyncPreset & { text: string };
 }
 
+/** Paso de corrección progresiva (acumulativo sobre el anterior). */
+export interface ResolveStep {
+  label: string;
+  why: string;
+  settings?: Partial<VentSettings>;
+  effort?: Partial<EffortParams>;
+  patient?: Partial<PatientParams>;
+}
+
 export const ASYNCHRONIES: Asynchrony[] = [
   {
     id: 'ineffective',
@@ -49,13 +58,13 @@ export const ASYNCHRONIES: Asynchrony[] = [
     consequences: 'Trabajo respiratorio desperdiciado, fatiga, disconfort, mayor duración de VM; marcador de sobreasistencia y de mortalidad (índice de asincronía > 10 %).',
     activate: {
       phenotype: 'copd',
-      effort: { pmusMax: 7, rr: 22, tiNeural: 0.9, relaxTau: 0.15, chemoGain: 0 },
-      settings: { mode: 'PSV', ps: 16, peep: 0, ets: 15, triggerType: 'pressure', pressureTrigger: 3, fio2: 0.35 },
+      effort: { pmusMax: 7, rr: 26, tiNeural: 0.8, relaxTau: 0.15, chemoGain: 0, variability: 0.12 },
+      settings: { mode: 'PSV', ps: 14, peep: 0, ets: 20, triggerType: 'flow', flowTrigger: 3, fio2: 0.35 },
     },
     resolve: {
       phenotype: 'copd',
-      settings: { ps: 9, ets: 40, peep: 6, triggerType: 'flow', flowTrigger: 2 },
-      text: 'PS 16→9, ETS 15→40 %, PEEP 0→6 (≈ 75 % de la auto-PEEP), disparo por flujo 2 L/min.',
+      settings: { ps: 10, ets: 40, peep: 6, triggerType: 'flow', flowTrigger: 2 },
+      text: 'PS 14→10, PEEP 0→6 (≈ 75 % de la auto-PEEP), disparo por flujo 2 L/min y ETS 20→40 %.',
     },
   },
   {
@@ -64,7 +73,7 @@ export const ASYNCHRONIES: Asynchrony[] = [
     phase: 'disparo',
     mechanism:
       'El ventilador interpreta como esfuerzo una señal que no lo es: fuga (el flujo de fuga en espiración simula un flujo inspiratorio), oscilaciones cardiogénicas, agua en el circuito, o sensibilidad excesiva.',
-    generation: 'Paciente sedado sin esfuerzo, fuga de 9 L/min en el neumotaponamiento, disparo por flujo a 1 L/min sin compensación de fugas.',
+    generation: 'Paciente sedado sin esfuerzo, fuga variable (≈ 6 L/min) en el neumotaponamiento, disparo por flujo a 1 L/min sin compensación de fugas.',
     curves:
       'Ciclos que comienzan sin deflexión negativa previa de Paw; flujo telespiratorio positivo constante; el volumen no vuelve a cero (Vti > Vte); frecuencia elevada y regular.',
     signs: ['FR total > FR programada en un paciente sin esfuerzo clínico', 'Ausencia de muesca de disparo en Paw', 'Vti − Vte elevado (fuga)'],
@@ -73,15 +82,15 @@ export const ASYNCHRONIES: Asynchrony[] = [
     consequences: 'Alcalosis respiratoria, hiperinsuflación dinámica, interpretación errónea del estado neurológico (p. ej. evaluación de muerte encefálica).',
     activate: {
       phenotype: 'healthy',
-      patient: { leak: 9, leakSite: 'airway' },
+      patient: { leak: 6, leakSite: 'airway', leakVar: 0.45 },
       effort: { pmusMax: 0, reverseTrigger: false },
-      settings: { mode: 'VCV', rr: 12, vt: 450, flowTrigger: 1, triggerType: 'flow', leakComp: false, peep: 8 },
+      settings: { mode: 'VCV', rr: 14, vt: 450, flowTrigger: 1, triggerType: 'flow', leakComp: false, peep: 8 },
     },
     resolve: {
       phenotype: 'healthy',
-      patient: { leak: 9, leakSite: 'airway' },
-      settings: { leakComp: true, flowTrigger: 3 },
-      text: 'Compensación de fugas activada y sensibilidad 1→3 L/min (lo definitivo es corregir la fuga).',
+      patient: { leak: 0, leakSite: 'airway', leakVar: 0 },
+      settings: { leakComp: true, flowTrigger: 4 },
+      text: 'Sensibilidad 1→4 L/min, compensación de fugas y corrección de la fuga.',
     },
   },
   {
@@ -155,7 +164,7 @@ export const ASYNCHRONIES: Asynchrony[] = [
     consequences: 'Aumento del trabajo isométrico, disconfort, progresión a esfuerzos inefectivos.',
     activate: {
       phenotype: 'copd',
-      effort: { pmusMax: 13, rr: 18, tiNeural: 0.9, chemoGain: 0 },
+      effort: { pmusMax: 13, rr: 18, tiNeural: 0.9, chemoGain: 0, variability: 0.1 },
       settings: { mode: 'VCV', rr: 16, vt: 500, peakFlow: 45, pause: 0, peep: 0, triggerType: 'pressure', pressureTrigger: 2.5 },
     },
     resolve: {
@@ -170,7 +179,7 @@ export const ASYNCHRONIES: Asynchrony[] = [
     phase: 'ciclado',
     mechanism:
       'El ventilador termina la inspiración antes que el paciente. En PSV ocurre con ETS alto y constantes de tiempo cortas (SDRA, restrictivos): el flujo cae rápido y alcanza el umbral precozmente mientras la Pmus sigue activa.',
-    generation: 'SDRA moderado con esfuerzo moderado y Ti neural 1.3 s en PSV 10 con ETS 60 %.',
+    generation: 'SDRA moderado con esfuerzo moderado y Ti neural 1.3 s en PSV 10 con ETS 60 % (disparo por presión).',
     curves:
       'Tras el ciclado, el flujo espiratorio inicial se interrumpe o se invierte (inspiración residual) y aparece una depresión de Paw al inicio de la espiración; puede progresar a doble disparo.',
     signs: ['Ti mecánico corto (< 0.6 s) respecto al esfuerzo', 'Muesca/joroba al inicio de la espiración', 'Doble disparos intermitentes'],
@@ -179,10 +188,10 @@ export const ASYNCHRONIES: Asynchrony[] = [
     consequences: 'Disnea, trabajo inspiratorio extra, doble disparo y Vt excesivo.',
     activate: {
       phenotype: 'ardsModerate',
-      effort: { pmusMax: 10, rr: 18, tiNeural: 1.3, chemoGain: 0 },
-      settings: { mode: 'PSV', ps: 10, ets: 60, peep: 10, riseTime: 0.1 },
+      effort: { pmusMax: 10, rr: 18, tiNeural: 1.3, chemoGain: 0, variability: 0.1 },
+      settings: { mode: 'PSV', ps: 10, ets: 60, peep: 10, riseTime: 0.1, triggerType: 'pressure', pressureTrigger: 2 },
     },
-    resolve: { phenotype: 'ardsModerate', settings: { ets: 25, ps: 12 }, text: 'ETS 60→25 % y PS 10→12 cmH₂O.' },
+    resolve: { phenotype: 'ardsModerate', settings: { ets: 25, triggerType: 'flow', flowTrigger: 2 }, text: 'ETS 60→25 % y disparo por flujo 2 L/min.' },
   },
   {
     id: 'delayedCycle',
@@ -191,17 +200,17 @@ export const ASYNCHRONIES: Asynchrony[] = [
     mechanism:
       'El ventilador sigue insuflando cuando el paciente ya terminó su inspiración neural. Típico en EPOC con PSV y ETS bajo: la constante de tiempo larga hace que el flujo tarde en caer al umbral. El paciente recluta músculos espiratorios.',
     generation: 'EPOC en PSV 18 con ETS 5 % y Ti neural 0.7 s; reflejo espiratorio activo.',
-    curves: 'Pico de presión al final de la inspiración (por encima de la PS) y caída brusca del flujo inspiratorio; Ti mecánico largo; puede ciclar por presión.',
+    curves: 'Espiga de presión al final de la inspiración (por encima de la PS) por la contracción espiratoria contra la válvula cerrada, con caída brusca del flujo inspiratorio; Ti mecánico largo; puede ciclar por presión.',
     signs: ['Espiga de Paw tardía', 'Caída abrupta («escalón») del flujo antes del ciclado', 'Ti > 1.2 s en PSV con FR alta'],
     differentials: ['Fuga (el flujo nunca cae al umbral → ciclado por tiempo)', 'Tos'],
     corrections: ['Aumentar ETS (40–60 % en EPOC)', 'Reducir PS', 'Revisar fugas'],
     consequences: 'Menor tiempo espiratorio → hiperinsuflación y esfuerzos inefectivos; trabajo espiratorio, disconfort.',
     activate: {
       phenotype: 'copd',
-      effort: { pmusMax: 8, rr: 18, tiNeural: 0.7, expReflex: 7, chemoGain: 0 },
+      effort: { pmusMax: 8, rr: 18, tiNeural: 0.7, expReflex: 11, chemoGain: 0, variability: 0.15 },
       settings: { mode: 'PSV', ps: 18, ets: 5, peep: 5, riseTime: 0.1, triggerType: 'flow', flowTrigger: 2 },
     },
-    resolve: { phenotype: 'copd', settings: { ets: 45, ps: 11 }, text: 'ETS 5→45 % y PS 18→11 cmH₂O.' },
+    resolve: { phenotype: 'copd', settings: { ets: 45, ps: 12 }, text: 'ETS 5→45 % y PS 18→12 cmH₂O.' },
   },
   {
     id: 'flowStarvation',
@@ -209,7 +218,7 @@ export const ASYNCHRONIES: Asynchrony[] = [
     phase: 'flujo',
     mechanism:
       'En VCV el flujo está fijado: si la demanda del paciente supera el flujo programado, la Pmus «tira» de la vía aérea y la Paw cae durante la insuflación (el ventilador no aporta más flujo).',
-    generation: 'VCV con flujo 30 L/min y esfuerzo intenso (Pmus ≈ 14 cmH₂O).',
+    generation: 'VCV con flujo 30 L/min y esfuerzo intenso (Pmus ≈ 9 cmH₂O, variable ciclo a ciclo).',
     curves: 'Curva de Paw cóncava hacia arriba («scooping») durante la inspiración, comparada con la morfología pasiva; el flujo cuadrado no cambia.',
     signs: ['Concavidad de Paw inspiratoria', 'Ppico variable ciclo a ciclo', 'Uso de musculatura accesoria'],
     differentials: ['Disparo reverso en VCV (deformación tardía)'],
@@ -217,13 +226,13 @@ export const ASYNCHRONIES: Asynchrony[] = [
     consequences: 'Trabajo respiratorio elevado, fatiga, disnea, riesgo de P-SILI.',
     activate: {
       phenotype: 'healthy',
-      effort: { pmusMax: 14, rr: 22, tiNeural: 1.0, chemoGain: 0 },
+      effort: { pmusMax: 9, rr: 20, tiNeural: 0.7, chemoGain: 0, variability: 0.15 },
       settings: { mode: 'VCV', vt: 450, peakFlow: 30, flowPattern: 'square', pause: 0, rr: 14, peep: 5 },
     },
     resolve: {
       phenotype: 'healthy',
-      settings: { mode: 'PSV', ps: 10, riseTime: 0.1, ets: 25 },
-      text: 'Cambio a PSV 10 cmH₂O (flujo libre según la demanda). Observe que con este impulso el Vt resultante es muy alto (riesgo de P-SILI): la asincronía se corrige, pero el problema de fondo es la demanda. Aumentar sólo el flujo en VCV acorta el Ti mecánico y, con este impulso, provoca doble disparo: pruébelo.',
+      settings: { mode: 'PSV', ps: 8, riseTime: 0.1, ets: 25 },
+      text: 'Cambio a PSV 8 cmH₂O (flujo libre según la demanda). Observe que con este impulso el Vt resultante es muy alto (riesgo de P-SILI): la asincronía se corrige, pero el problema de fondo es la demanda. Aumentar sólo el flujo en VCV acorta el Ti mecánico y, con este impulso, provoca doble disparo: pruébelo.',
     },
   },
   {
@@ -340,5 +349,82 @@ export function buildPreset(
     effort: { ...src.effort, ...(pre.effort ?? {}) },
   };
   const settings: VentSettings = { ...baseSettings, ...(pre.settings ?? {}), alarms: { ...baseSettings.alarms } };
+  return { patient, settings };
+}
+
+/**
+ * Corrección escalonada de cada asincronía, siguiendo el manejo propuesto por Varón-Vega et al.
+ * (Acta Colomb Cuid Intensivo 2024, figs. 6–8). Cada paso se aplica sobre el anterior para que la
+ * sincronía (%) mejore de forma progresiva; el último paso deja al paciente sincrónico.
+ */
+export const RESOLVE_STEPS: Record<string, ResolveStep[]> = {
+  ineffective: [
+    { label: 'Disminuir la presión soporte 14 → 10 cmH₂O', why: 'La PS excesiva genera Vt grande y Ti largo: la espiración no termina y el siguiente esfuerzo no alcanza el disparo.', settings: { ps: 10 } },
+    { label: 'Corregir la auto-PEEP: PEEP 0 → 6 cmH₂O', why: 'PEEP externa ≈ 75 % de la auto-PEEP: reduce el umbral que el paciente debe vencer para disparar.', settings: { peep: 6 } },
+    { label: 'Optimizar el disparo (flujo 2 L/min) y ciclar antes (ETS 40 %)', why: 'Disparo más sensible y más tiempo espiratorio en el EPOC.', settings: { triggerType: 'flow', flowTrigger: 2, ets: 40 } },
+  ],
+  autotrigger: [
+    { label: 'Reducir la sensibilidad del disparo 1 → 4 L/min', why: 'Sólo los picos de fuga alcanzan ahora el umbral de disparo.', settings: { flowTrigger: 4 } },
+    { label: 'Revisar el neumotaponamiento y el circuito: fuga 6 → 4 L/min', why: 'Menos flujo de fuga durante la espiración.', patient: { leak: 4 } },
+    { label: 'Corregir la fuga y activar la compensación de fugas', why: 'La solución definitiva es eliminar la fuga.', settings: { leakComp: true }, patient: { leak: 0, leakVar: 0 } },
+  ],
+  double: [
+    { label: 'Aumentar el tiempo inspiratorio: flujo 60 → 45 L/min con rampa descendente', why: 'Acerca el Ti mecánico al Ti neural del paciente.', settings: { peakFlow: 45, flowPattern: 'decel' } },
+    { label: 'Añadir pausa inspiratoria 0.3 s', why: 'Prolonga aún más el Ti mecánico sin aumentar el Vt.', settings: { pause: 0.3 } },
+    { label: 'Disminuir la sensibilidad del disparo (4 L/min) y ajustar analgesia/sedación', why: 'El esfuerzo residual tras el ciclado ya no dispara un segundo ciclo; se controla el impulso elevado.', settings: { triggerType: 'flow', flowTrigger: 4 }, effort: { pmusMax: 8 } },
+  ],
+  reverse: [
+    { label: 'Incrementar el tiempo inspiratorio 0.8 → 1.2 s', why: 'Modifica la relación de arrastre: el acoplamiento pasa de 1:1 a 1:2.', settings: { ti: 1.2 }, effort: { rtRatio: 2 } },
+    { label: 'Disminuir la frecuencia respiratoria 18 → 14', why: 'Menos insuflaciones pasivas que desencadenen el reflejo (acoplamiento 1:3).', settings: { rr: 14 }, effort: { rtRatio: 3 } },
+    { label: 'Disminuir la sedación', why: 'El paciente recupera su propio ritmo y dispara el ventilador: desaparece el arrastre.', effort: { reverseTrigger: false, pmusMax: 5, rr: 16, tiNeural: 1.0 } },
+  ],
+  lateTrigger: [
+    { label: 'Corregir la auto-PEEP: PEEP 0 → 6 cmH₂O', why: 'Disminuye el umbral elástico previo al disparo.', settings: { peep: 6 } },
+    { label: 'Aumentar la sensibilidad: disparo por presión 2.5 → 1.5 cmH₂O', why: 'El ventilador detecta antes el esfuerzo.', settings: { pressureTrigger: 1.5 } },
+    { label: 'Disparo por flujo 2 L/min y pausa inspiratoria 0.25 s', why: 'Disparo más rápido; la pausa ajusta el Ti mecánico al neural para que no aparezca doble disparo.', settings: { triggerType: 'flow', flowTrigger: 2, pause: 0.25 } },
+  ],
+  prematureCycle: [
+    { label: 'Disminuir el ETS 60 → 50 %', why: 'El ventilador cicla algo más tarde.', settings: { ets: 50 } },
+    { label: 'Disminuir el ETS 50 → 35 %', why: 'Ti mecánico más cercano al Ti neural del paciente.', settings: { ets: 35 } },
+    { label: 'ETS 25 % y disparo por flujo 2 L/min', why: 'Ti mecánico ≈ Ti neural; disparo más sensible.', settings: { ets: 25, triggerType: 'flow', flowTrigger: 2 } },
+  ],
+  delayedCycle: [
+    { label: 'Aumentar el ETS 5 → 20 %', why: 'Ciclado más temprano en un paciente con constante de tiempo larga.', settings: { ets: 20 } },
+    { label: 'Aumentar el ETS 20 → 30 %', why: 'El ciclado se acerca al final del esfuerzo neural.', settings: { ets: 30 } },
+    { label: 'ETS 45 % y presión soporte 18 → 12 cmH₂O', why: 'En EPOC suele requerirse ETS 40–60 %; menor PS = menor Vt y Ti.', settings: { ets: 45, ps: 12 } },
+  ],
+  flowStarvation: [
+    { label: 'Aumentar el flujo 30 → 40 L/min', why: 'Más cerca de la demanda inspiratoria del paciente.', settings: { peakFlow: 40 } },
+    { label: 'Pasar a un modo espontáneo: PSV 8 cmH₂O', why: 'El flujo se adapta a la demanda en cada ciclo (vigile el Vt: el problema de fondo es la demanda).', settings: { mode: 'PSV', ps: 8, riseTime: 0.1, ets: 25 } },
+  ],
+  flowExcess: [
+    { label: 'Disminuir la presión soporte 18 → 15 cmH₂O', why: 'Menor gradiente de presurización (el sobreimpulso disminuye, pero persiste).', settings: { ps: 15 } },
+    { label: 'Aumentar el tiempo de rampa 0 → 0.2 s y PS 12 cmH₂O', why: 'Presurización suave: desaparece el sobreimpulso.', settings: { riseTime: 0.2, ps: 12 } },
+  ],
+  airTrapping: [
+    { label: 'Disminuir la frecuencia 24 → 18', why: 'Alarga el tiempo espiratorio (la auto-PEEP baja, pero persiste).', settings: { rr: 18 } },
+    { label: 'Frecuencia 14 y flujo 70 L/min', why: 'Ti más corto y Te más largo: la espiración llega a completarse.', settings: { rr: 14, peakFlow: 70 } },
+    { label: 'Frecuencia 12, Vt 450 mL y flujo 80 L/min', why: 'Menor ventilación minuto: margen frente al atrapamiento.', settings: { rr: 12, vt: 450, peakFlow: 80 } },
+  ],
+  flowAsync: [
+    { label: 'Aumentar la presión soporte 6 → 8 cmH₂O', why: 'Más flujo entregado, aunque la presurización sigue siendo lenta.', settings: { ps: 8 } },
+    { label: 'Acortar el tiempo de rampa 0.4 → 0.05 s y PS 10 cmH₂O', why: 'El flujo inicial acompaña la demanda (vigile el Vt).', settings: { riseTime: 0.05, ps: 10 } },
+  ],
+  stacking: [
+    { label: 'Aumentar el Ti: flujo 70 → 45 L/min con rampa', why: 'Ti mecánico más cercano al Ti neural.', settings: { peakFlow: 45, flowPattern: 'decel' } },
+    { label: 'Añadir pausa inspiratoria 0.4 s', why: 'Prolonga la inspiración mecánica.', settings: { pause: 0.4 } },
+    { label: 'Disminuir el impulso: analgesia/sedación (Pmus 18 → 6)', why: 'Si la enfermedad lo exige, controlar el impulso respiratorio.', effort: { pmusMax: 6 } },
+  ],
+};
+
+/** Aplica los pasos de corrección hasta `upTo` (incluido) sobre paciente y ajustes actuales. */
+export function applySteps(steps: ResolveStep[], upTo: number, s: VentSettings, p: PatientParams): { patient: PatientParams; settings: VentSettings } {
+  let settings: VentSettings = { ...s, alarms: { ...s.alarms } };
+  let patient: PatientParams = { ...p, effort: { ...p.effort } };
+  for (let i = 0; i <= upTo && i < steps.length; i++) {
+    const st = steps[i];
+    settings = { ...settings, ...(st.settings ?? {}), alarms: { ...settings.alarms } };
+    patient = { ...patient, ...(st.patient ?? {}), effort: { ...patient.effort, ...(st.effort ?? {}) } };
+  }
   return { patient, settings };
 }

@@ -15,6 +15,7 @@ export const REF = {
   tuxen: 'Tuxen DV, Lane S. The effects of ventilatory pattern on hyperinflation, airway pressures, and circulation in mechanical ventilation of patients with severe air-flow obstruction. Am Rev Respir Dis 1987;136:872–9.',
   thille: 'Thille AW, et al. Patient-ventilator asynchrony during assisted mechanical ventilation. Intensive Care Med 2006;32:1515–22.',
   blanch: 'Blanch L, et al. Asynchronies during mechanical ventilation are associated with mortality. Intensive Care Med 2015;41:633–41.',
+  varon: 'Varón-Vega F, Moreano S, Tuta-Quintero E, et al. Asincronía paciente-ventilador: abordaje clínico práctico. Acta Colomb Cuid Intensivo 2024. doi:10.1016/j.acci.2024.03.003.',
   akoumianaki: 'Akoumianaki E, et al. Mechanical ventilation-induced reverse-triggered breaths: a frequently unrecognized form of neuromechanical coupling. Chest 2013;143:927–38.',
   psili: 'Brochard L, Slutsky A, Pesenti A. Mechanical ventilation to minimize progression of lung injury in acute respiratory failure. Am J Respir Crit Care Med 2017;195:438–42.',
   bertoni: 'Bertoni M, et al. A novel non-invasive method to detect excessively high respiratory effort and dynamic transpulmonary driving pressure during mechanical ventilation. Crit Care 2019;23:346.',

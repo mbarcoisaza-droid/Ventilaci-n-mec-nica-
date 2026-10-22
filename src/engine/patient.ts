@@ -123,7 +123,7 @@ export class PatientDrive {
     if (reflex > 0 && this.pmax > 0 && ventInspiring && t > neuralEnd + 0.15 && t - this.onset < 6) {
       if (this.reflexStart === null) this.reflexStart = t;
       this.reflexRelease = null;
-      this.reflexLevel = reflex * Math.min(1, (t - this.reflexStart) / 0.25);
+      this.reflexLevel = reflex * Math.min(1, (t - this.reflexStart) / 0.12);
     } else if (this.reflexStart !== null) {
       if (this.reflexRelease === null) this.reflexRelease = t;
       const lvl = this.reflexLevel * Math.exp(-(t - this.reflexRelease) / 0.12);

@@ -20,6 +20,10 @@ Alternativa sin instalación: `npm run build:single` genera `dist-single/index.h
 
 El módulo «Paciente real» recibe la programación del ventilador, la mecánica medida (Ppico, Pplat, PEEP total, Vte, FR, P0.1, ΔPocc, Pes), variables clínicas y gases arteriales. `src/engine/calibrate.ts` ajusta el modelo por simulación iterativa: compliance, resistencia, auto-PEEP, esfuerzo, espacio muerto, shunt, HCO₃⁻ y PAM. Después el paciente calibrado queda cargado para probar cambios. Lo que no se mide se toma del fenotipo elegido y se declara como supuesto. Es un ejercicio educativo, no una recomendación clínica.
 
+## Laboratorio de asincronías
+
+Las 12 asincronías reproducen la morfología descrita por Varón-Vega et al. (*Acta Colomb Cuid Intensivo* 2024, figs. 6–8): esfuerzos inefectivos con «joroba» del flujo espiratorio, doble disparo con volumen apilado, espiga de presión en el ciclado tardío, muesca espiratoria en el ciclado prematuro, Paw cóncava en el flujo insuficiente, etc. Al activarla, la asincronía aparece en todos los ciclos; el indicador **Sincronía paciente-ventilador (%)** (ciclos sin asincronía en los últimos 30 s) sube a medida que se aplican, uno a uno, los pasos de corrección propuestos en esa revisión.
+
 ## Uso para desarrollo
 
 ```bash

@@ -112,6 +112,8 @@ export interface PatientParams {
   hr: number; // lpm
   leak: number; // L/min a 10 cmH2O
   leakSite: 'airway' | 'alveolar';
+  /** variabilidad lenta de la fuga (0–0.5; p. ej. neumotaponamiento que cambia con los movimientos) */
+  leakVar?: number;
   // --- intercambio gaseoso / hemodinamia (modelo de compartimento único) ---
   vco2: number; // mL/min
   vo2: number; // mL/min

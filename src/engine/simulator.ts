@@ -32,7 +32,19 @@ const TRIG_LOCKOUT = 0.12; // s periodo refractario tras el inicio de la espirac
 const TRIG_RESPONSE = 0.04; // s retraso de respuesta de la válvula
 const TI_MAX_PS = 2.5; // s ciclado de seguridad en PSV
 const MIN_TE_MACHINE = 0.25; // s espiración mínima antes de un ciclo por máquina
-const DECEL_END = 0.25; // rampa descendente hasta el 25 % del flujo pico
+const RELIEF = 3; // cmH2O sobre el objetivo a partir del cual se abre la válvula espiratoria durante la inspiración por presión
+const CYCLE_RESPONSE = 0.04; // s retraso entre el criterio de ciclado por flujo y la apertura de la válvula espiratoria
+const DECEL_END = 0.25;
+/** asincronías mayores que cuentan para el % de sincronía (además de los esfuerzos inefectivos) */
+const SYNC_MAJOR = new Set(['double', 'reverse', 'autotrigger', 'prematureCycle', 'delayedCycle', 'flowStarvation', 'flowAsync']);
+/** asincronías que se cuentan al estudiar una concreta */
+const SYNC_FAMILY: Record<string, string[]> = {
+  ineffective: ['ineffective'],
+  double: ['double'],
+  flowStarvation: ['flowStarvation', 'double'],
+  stacking: ['double', 'stacking'],
+  flowExcess: ['flowExcess'],
+}; // rampa descendente hasta el 25 % del flujo pico
 
 export type Phase = 'exp' | 'insp' | 'pause' | 'holdI' | 'holdE' | 'occl';
 export const PHASE_CODE: Record<Phase, number> = { exp: 0, insp: 1, pause: 2, holdI: 3, holdE: 4, occl: 5 };
@@ -48,6 +60,8 @@ export interface Marker {
 
 export interface AsyncEvent {
   t: number;
+  /** índice del ciclo al que pertenece (BreathRecord.index) */
+  breath?: number;
   type:
     | 'ineffective'
     | 'double'
@@ -106,6 +120,7 @@ interface Acc {
   inspN: number;
   t90: number | null; // tiempo hasta alcanzar el 90 % de la presión objetivo
   pawInspMax: number;
+  pawEarlyMax: number;
   vcDip: number; // máxima caída de Paw durante una insuflación VC (concavidad por esfuerzo)
   s: number[]; // sumas para mínimos cuadrados (9 + 3 + 1)
 }
@@ -142,6 +157,7 @@ function newAcc(v: number): Acc {
     inspN: 0,
     t90: null,
     pawInspMax: -99,
+    pawEarlyMax: -99,
     vcDip: 0,
     s: new Array(13).fill(0),
   };
@@ -278,6 +294,9 @@ export class Simulator {
   flowMeas = 0; // L/s medido en Y
   pmusVal = 0;
   dispVol = 0; // L
+  private cycleDetectAt: number | null = null;
+  /** instante del último cambio de programación o de paciente (para la ventana de sincronía) */
+  lastChange = 0;
   private el = { pLung: 0, pCw: 0, pEl: 0, pOver: 0 };
   private acc: Acc;
   private lastEffortOnset = -1;
@@ -311,6 +330,7 @@ export class Simulator {
   // ---------------------------------------------------------------- configuración
   setSettings(s: VentSettings) {
     const prevMode = this.settings.mode;
+    this.lastChange = this.t;
     this.settings = { ...s, alarms: { ...s.alarms } };
     if (prevMode !== s.mode) {
       this.simvPeriodStart = this.t;
@@ -333,6 +353,7 @@ export class Simulator {
 
   setPatient(p: PatientParams) {
     const keepV = this.mech;
+    this.lastChange = this.t;
     this.patient = clonePatient(p);
     this.pbw = predictedBodyWeight(p.sex, p.heightCm);
     this.mech = { v: keepV.v, p2: keepV.p2, r: Math.max(p.rMin, Math.min(1, keepV.r)) };
@@ -428,13 +449,16 @@ export class Simulator {
   private leakFlow(paw: number, palv: number): number {
     const p = this.patient;
     if (p.leak <= 0) return 0;
-    const k = p.leak / 60 / Math.sqrt(10);
+    let k = p.leak / 60 / Math.sqrt(10);
+    if (p.leakVar) k *= 1 + p.leakVar * (0.6 * Math.sin((2 * Math.PI * this.t) / 7.3) + 0.4 * Math.sin((2 * Math.PI * this.t) / 3.1));
     const pr = p.leakSite === 'airway' ? paw : palv;
     return k * Math.sqrt(Math.max(pr, 0));
   }
 
   // ---------------------------------------------------------------- transiciones
   private startBreath(kind: BreathKind, trigger: BreathTrigger, mandatory: boolean) {
+    const prevVti = this.acc ? this.acc.vti : 0;
+    const truncated = this.phase === 'exp' && this.t - this.phaseStart < 0.4 && this.dispVol > 0.4 * prevVti && prevVti > 0.05;
     this.finalizeBreath();
     const t = this.t;
     this.kind = kind;
@@ -444,7 +468,10 @@ export class Simulator {
     this.phase = 'insp';
     this.phaseStart = t;
     this.breathStart = t;
-    this.dispVol = 0;
+    // el volumen mostrado se reinicia en cada inspiración, salvo si la espiración previa quedó truncada
+    // (doble disparo / breath stacking): entonces el nuevo ciclo se apila sobre el volumen no exhalado
+    if (!truncated) this.dispVol = 0;
+    this.cycleDetectAt = null;
     this.peakFlowMeas = 0;
     this.acc = newAcc(this.mech.v);
     const tTrig = trigger === 'patient' ? Math.min(t, this.trigDetectAt ?? t - TRIG_RESPONSE) : undefined;
@@ -491,8 +518,8 @@ export class Simulator {
     return Math.max(0, prev.vte) / prev.vtLung;
   }
 
-  private pushAsync(type: AsyncEvent['type']) {
-    this.asyncEvents.push({ t: this.t, type });
+  private pushAsync(type: AsyncEvent['type'], breath = this.breathCounter) {
+    this.asyncEvents.push({ t: this.t, type, breath });
     if (this.asyncEvents.length > 500) this.asyncEvents.splice(0, 100);
   }
 
@@ -531,7 +558,7 @@ export class Simulator {
     if (eff && eff.pmax > 0.3 && !eff.reverse && this.kind !== 'APRV') {
       const neuralEnd = eff.onset + eff.ti;
       if (neuralEnd - t > 0.25 && this.trig === 'patient') this.pushAsync('prematureCycle');
-      else if (t - neuralEnd > 0.35 && eff.onset <= this.breathStart + 0.05) this.pushAsync('delayedCycle');
+      else if (t - neuralEnd > 0.25 && eff.onset <= this.breathStart + 0.05) this.pushAsync('delayedCycle');
     }
   }
 
@@ -607,14 +634,15 @@ export class Simulator {
   private detectBreathAsync(rec: BreathRecord, a: Acc) {
     const meanPmus = a.inspN ? a.inspPmusSum / a.inspN : 0;
     const dp = this.plan.level - this.plan.base;
-    const dipLimit = this.plan.pattern === 'square' ? 1.5 : 3;
-    if (rec.kind === 'VC' && meanPmus > 2 && a.vcDip > dipLimit) this.pushAsync('flowStarvation');
+    const dipLimit = this.plan.pattern === 'square' ? 2.5 : 4;
+    if (rec.kind === 'VC' && meanPmus > 2 && a.vcDip > dipLimit) this.pushAsync('flowStarvation', rec.index);
     if ((rec.kind === 'PC' || rec.kind === 'PS') && dp >= 3) {
-      if (a.pawInspMax > this.plan.level + 1.5) this.pushAsync('flowExcess');
-      else if (meanPmus > 3 && (a.t90 === null || a.t90 > 0.3)) this.pushAsync('flowAsync');
+      // sobreimpulso al inicio de la presurización (la espiga tardía por esfuerzo espiratorio es ciclado tardío)
+      if (a.pawEarlyMax > this.plan.level + 1.5) this.pushAsync('flowExcess', rec.index);
+      else if (meanPmus > 3 && (a.t90 === null || a.t90 > 0.3)) this.pushAsync('flowAsync', rec.index);
     }
-    if (rec.kind === 'VC' && rec.peakInspFlow > 90 && rec.ti < 0.5) this.pushAsync('flowExcess');
-    if (rec.kind !== 'APRV' && rec.te > 0.4 && rec.eef < -5 && rec.peepTotalModel - rec.peep > 2) this.pushAsync('airTrapping');
+    if (rec.kind === 'VC' && rec.peakInspFlow > 90 && rec.ti < 0.5) this.pushAsync('flowExcess', rec.index);
+    if (rec.kind !== 'APRV' && rec.te > 0.4 && rec.eef < -5 && rec.peepTotalModel - rec.peep > 2) this.pushAsync('airTrapping', rec.index);
   }
 
   // ---------------------------------------------------------------- maniobras
@@ -806,8 +834,16 @@ export class Simulator {
 
     const pressureControl = (target: number) => {
       const drive = target + pm - pElTot;
-      const r = drive >= 0 ? p.rInsp : p.rExp + R_EXP_VALVE;
-      let q = flowFromDrive(drive, r, p.k2);
+      if (drive < 0) {
+        // la válvula inspiratoria no puede aspirar y la espiratoria está cerrada: si el paciente empuja
+        // (espiración activa), la Paw sube hasta la presión alveolar; por encima de objetivo + RELIEF se alivia
+        const over = pElTot - pm - (target + RELIEF);
+        if (over <= 0) return { q: 0, paw: pElTot - pm };
+        let q = -flowFromDrive(over, p.rExp + R_EXP_VALVE, p.k2);
+        q = -Math.min(-q, expiratoryFlowLimit(p, e.pLung));
+        return { q, paw: target + RELIEF };
+      }
+      let q = flowFromDrive(drive, p.rInsp, p.k2);
       if (q < 0) q = -Math.min(-q, expiratoryFlowLimit(p, e.pLung));
       if (q + airwayLeak > QMAX) {
         q = QMAX - airwayLeak;
@@ -884,6 +920,7 @@ export class Simulator {
       a.inspN++;
       if (this.kind === 'VC' && tIn > 0.08) a.vcDip = Math.max(a.vcDip, a.pawInspMax - paw);
       if (paw > a.pawInspMax) a.pawInspMax = paw;
+      if (tIn < 0.35 && paw > a.pawEarlyMax) a.pawEarlyMax = paw;
       if (this.kind !== 'VC' && a.t90 === null && paw >= this.plan.base + 0.9 * (this.plan.level - this.plan.base)) a.t90 = tIn;
     }
     if (pmus > a.pmusPeak) a.pmusPeak = pmus;
@@ -1075,6 +1112,9 @@ export class Simulator {
     if (fm > this.peakFlowMeas) this.peakFlowMeas = fm;
     const target = this.pressureTarget(tIn);
     if (tIn > 0.12 && fm < this.peakFlowMeas * (s.ets / 100) && fm < this.peakFlowMeas * 0.98) {
+      if (this.cycleDetectAt === null) this.cycleDetectAt = this.t;
+    }
+    if (this.cycleDetectAt !== null && this.t - this.cycleDetectAt >= CYCLE_RESPONSE) {
       this.endInsp(`flujo (${s.ets}% del pico)`);
     } else if (tIn >= TI_MAX_PS) {
       this.raise('timax', 'medium', 'Ciclado por tiempo máximo en PSV (¿fuga? ¿ETS bajo?)');
@@ -1412,6 +1452,39 @@ export class Simulator {
   }
 
   /** Exporta las curvas de la ventana a CSV */
+  /**
+   * Sincronía paciente-ventilador (%) en una ventana reciente = % de ciclos del ventilador sin
+   * asincronía (un esfuerzo inefectivo marca el ciclo en cuya espiración ocurre). Con `focus` se mide sólo la asincronía estudiada (y su
+   * familia); sin él, todas las asincronías mayores (Varón-Vega 2024). La ventana empieza en el último
+   * cambio de programación (mín. `minSec`) para que el valor refleje la configuración actual.
+   * En el doble disparo / breath stacking ambos ciclos del par cuentan como asincrónicos.
+   */
+  syncStats(windowSec = 30, minSec = 10, focus?: string): { pct: number; cycles: number; asyncCycles: number; window: number } {
+    const t = this.t;
+    const w = Math.min(windowSec, Math.max(minSec, t - this.lastChange));
+    const from = t - w;
+    const br = this.breaths.filter((b) => b.tStart > from);
+    if (!br.length) return { pct: 100, cycles: 0, asyncCycles: 0, window: w };
+    const family = focus ? SYNC_FAMILY[focus] ?? [focus] : null;
+    const counted = (type: string) => (family ? family.includes(type) : SYNC_MAJOR.has(type));
+    const flagged = new Set<number>();
+    for (const a of this.asyncEvents) {
+      if (a.t <= from - 5 || a.breath === undefined || !counted(a.type)) continue;
+      flagged.add(a.breath);
+      if (a.type === 'double' || a.type === 'stacking') flagged.add(a.breath - 1); // ambos ciclos del par
+    }
+    if (!family || family.includes('ineffective')) {
+      if (!this.aprvActive && this.modeAllowsTrigger)
+        for (const e of this.drive.efforts) {
+          if (e.onset <= from || e.triggered || e.reverse) continue;
+          const b = br.find((x) => e.onset >= x.tStart && e.onset < x.tEnd);
+          if (b) flagged.add(b.index);
+        }
+    }
+    const asyncCycles = br.filter((b) => flagged.has(b.index)).length;
+    return { pct: Math.round(100 * (1 - asyncCycles / br.length)), cycles: br.length, asyncCycles, window: w };
+  }
+
   toCSV(w: number): string {
     const rows = ['t_s,paw_cmH2O,flow_Lmin,vol_mL,pmus_cmH2O,ppl_cmH2O,ptp_cmH2O,palv_cmH2O,phase'];
     for (const i of this.window(w)) {

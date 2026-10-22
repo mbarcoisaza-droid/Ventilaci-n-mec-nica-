@@ -469,7 +469,7 @@ export default function App() {
                 addCustom={(c) => setCustomCases((l) => [...l.filter((x) => x.id !== c.id), c])}
               />
             )}
-            {tab === 'asincronias' && <AsyncPanel settings={settings} patient={patient} level={level} apply={apply} events={events} />}
+            {tab === 'asincronias' && <AsyncPanel sim={sim} settings={settings} patient={patient} level={level} apply={apply} events={events} />}
             {tab === 'maniobras' && <ManeuversPanel ctl={ctl} m={m} showModel={level < 3} tick={sim.t} />}
             {tab === 'paciente' && (
               <PatientPanel

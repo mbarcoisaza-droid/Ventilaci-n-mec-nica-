@@ -60,7 +60,7 @@ export function TheoryPanel({ mode }: { mode: ModeId }) {
       <div className="sec">
         <h3>Bibliografía principal</h3>
         <ul className="tight small muted">
-          {[REF.chatburn, REF.tobin, REF.marini, REF.hess, REF.bates, REF.hyatt, REF.ardsnet, REF.amato, REF.esicm, REF.power, REF.thille, REF.akoumianaki, REF.psili, REF.bertoni, REF.telias].map((r) => <li key={r}>{r}</li>)}
+          {[REF.chatburn, REF.tobin, REF.marini, REF.hess, REF.bates, REF.hyatt, REF.ardsnet, REF.amato, REF.esicm, REF.power, REF.thille, REF.varon, REF.akoumianaki, REF.psili, REF.bertoni, REF.telias].map((r) => <li key={r}>{r}</li>)}
         </ul>
       </div>
     </>
