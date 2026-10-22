@@ -67,6 +67,8 @@ export default function App() {
   const [justification, setJustification] = useState('');
   const [report, setReport] = useState<Report | null>(null);
   const [customCases, setCustomCases] = useState<ClinicalCase[]>([]);
+  const [confirmReset, setConfirmReset] = useState(false);
+  const [panelKey, setPanelKey] = useState(0); // reinicia el estado interno de los módulos
 
   const [installable, setInstallable] = useState(canInstall());
   useEffect(() => onInstallChange(() => setInstallable(canInstall())), []);
@@ -154,6 +156,30 @@ export default function App() {
     }
   };
 
+  /** Vuelve a la configuración inicial de la aplicación para empezar otro caso. */
+  const newSession = () => {
+    ctl.replace(INIT_SETTINGS, INIT_PATIENT, {}, 12);
+    setSettingsState(INIT_SETTINGS);
+    setPatientState(INIT_PATIENT);
+    setActiveCase(null);
+    setReport(null);
+    setInitialSnap(null);
+    setAnswers({});
+    setJustification('');
+    setFrozen(null);
+    setFrozenLoop(null);
+    setModelView(false);
+    setScales({ paw: 0, flow: 0, vol: 0 });
+    setWin(12);
+    ctl.speed = 1;
+    setSpeed(1);
+    ctl.running = true;
+    setRunning(true);
+    setPanelKey((k) => k + 1);
+    setConfirmReset(false);
+    setTab('casos');
+  };
+
   const freeze = () => {
     setFrozen(captureTrace(ctl, win, `t = ${ctl.sim.t.toFixed(0)} s`));
     const loops = breathLoops(ctl, 2);
@@ -219,10 +245,24 @@ export default function App() {
               {running ? '❚❚' : '▶'}
             </button>
             <button onClick={() => { ctl.running = false; setRunning(false); sim.advanceBreath(); ctl.redraw(); setTick((t) => t + 1); }} title="Avanzar un ciclo">▶❘ 1 ciclo</button>
-            <button onClick={reset} title="Reiniciar">↺</button>
+            <button onClick={reset} title={activeCase ? 'Reiniciar el caso actual' : 'Reiniciar la simulación con la configuración actual'} aria-label="Reiniciar">↺</button>
             <select aria-label="Velocidad" value={speed} onChange={(e) => { const v = parseFloat(e.target.value); ctl.speed = v; setSpeed(v); }}>
               {[0.25, 0.5, 1, 2, 4].map((v) => <option key={v} value={v}>{v}×</option>)}
             </select>
+          </div>
+          <div className="sb-newwrap">
+            <button className="sb-new" onClick={() => setConfirmReset((v) => !v)} title="Restablecer la configuración inicial para empezar otro caso" aria-expanded={confirmReset}>
+              ⟲ Nuevo caso
+            </button>
+            {confirmReset && (
+              <div className="sb-confirm" role="dialog" aria-label="Confirmar nuevo caso">
+                <p>¿Volver a la configuración inicial? Se cerrará {activeCase ? `«${activeCase.title}»` : 'la simulación actual'} y se perderán los ajustes, maniobras y respuestas no guardados.</p>
+                <div className="row">
+                  <button className="primary" onClick={newSession}>Restablecer</button>
+                  <button onClick={() => setConfirmReset(false)}>Cancelar</button>
+                </div>
+              </div>
+            )}
           </div>
           {installable && (
             <button className="sb-install" onClick={() => promptInstall()} title="Instalar Ventilab como aplicación en este equipo">⤓ Instalar</button>
@@ -308,7 +348,7 @@ export default function App() {
             <h2>{tabTitle}</h2>
             <button onClick={() => setTab(null)} aria-label="Cerrar panel">✕</button>
           </div>
-          <div className="drawer-body">
+          <div className="drawer-body" key={panelKey}>
             {tab === 'real' && <RealPatientPanel onApply={loadRealPatient} />}
             {tab === 'casos' && (
               <CasesPanel
