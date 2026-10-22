@@ -72,6 +72,22 @@ export default function App() {
   const [report, setReport] = useState<Report | null>(null);
   const [customCases, setCustomCases] = useState<ClinicalCase[]>([]);
   const [confirmReset, setConfirmReset] = useState(false);
+  const [loopsOpen, setLoopsOpen] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('vmsim-loops-open') !== '0';
+    } catch {
+      return true;
+    }
+  });
+  const toggleLoops = () =>
+    setLoopsOpen((v) => {
+      try {
+        localStorage.setItem('vmsim-loops-open', v ? '0' : '1');
+      } catch {
+        /* sin almacenamiento */
+      }
+      return !v;
+    });
   const [caseAsyncOpt, setCaseAsyncOpt] = useState<{ type: string; severity: AsyncSeverity } | null>(null);
   const [undoStack, setUndoStack] = useState<{ settings: VentSettings; patient: PatientParams }[]>([]);
   const [lastApplied, setLastApplied] = useState<{ name: string; what: string; t: number } | null>(null);
@@ -325,7 +341,7 @@ export default function App() {
         ))}
       </nav>
 
-      <main className="center">
+      <main className={'center' + (loopsOpen ? '' : ' loops-collapsed')}>
         <section className="pane wavepane">
           <div className="panebar">
             <select aria-label="Ventana de tiempo" value={win} onChange={(e) => setWin(parseFloat(e.target.value))}>
@@ -365,13 +381,26 @@ export default function App() {
         </div>
         <section className="pane looppane">
           <div className="panebar">
+            <button
+              className="collapse-btn"
+              onClick={toggleLoops}
+              aria-expanded={loopsOpen}
+              aria-controls="loops-body"
+              title={loopsOpen ? 'Ocultar los bucles' : 'Mostrar los bucles'}
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true" className={loopsOpen ? '' : 'rot'}><path d="M6 9l6 6 6-6" /></svg>
+            </button>
             <span className="panetitle">Bucles</span>
             <select aria-label="Bucles previos" value={history} onChange={(e) => setHistory(+e.target.value)}>
               {[0, 1, 3, 6].map((v) => <option key={v} value={v}>{v} previos</option>)}
             </select>
             <span className="panehint">{frozenLoop ? 'discontinua: referencia' : ''}{showModel ? ' · naranja: PL–V (modelo)' : ''}</span>
           </div>
-          <Loops ctl={ctl} history={history} showModel={showModel} frozen={frozenLoop} />
+          {loopsOpen && (
+            <div id="loops-body" className="loops-body">
+              <Loops ctl={ctl} history={history} showModel={showModel} frozen={frozenLoop} />
+            </div>
+          )}
         </section>
       </main>
 

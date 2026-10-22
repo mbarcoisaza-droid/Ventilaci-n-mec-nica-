@@ -1,9 +1,6 @@
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import type { PatientParams, VentSettings } from '../../engine/types';
-import { Simulator } from '../../engine/simulator';
-import { DEFAULT_SETTINGS } from '../../engine/presets';
 import { ASYNCHRONIES, ASYNC_EVENT_LABEL, buildPreset, type Asynchrony } from '../../education/asynchronies';
-import { StaticChart } from '../StaticChart';
 
 interface Props {
   settings: VentSettings;
@@ -30,30 +27,10 @@ function Detail({ a, revealName }: { a: Asynchrony; revealName: boolean }) {
   );
 }
 
-/** Simulación fuera de línea para la comparación doble disparo / disparo reverso */
-function offline(id: string) {
-  const a = ASYNCHRONIES.find((x) => x.id === id)!;
-  const { patient, settings } = buildPreset(a.activate, { ...DEFAULT_SETTINGS, alarms: { ...DEFAULT_SETTINGS.alarms, pawMax: 60 } });
-  const sim = new Simulator(settings, patient);
-  sim.advance(24);
-  const idx = sim.window(8);
-  const t0 = sim.t - 8;
-  return {
-    t: idx.map((i) => sim.bt[i] - t0),
-    paw: idx.map((i) => sim.bpaw[i]),
-    flow: idx.map((i) => sim.bflow[i]),
-    pmus: idx.map((i) => sim.bpmus[i]),
-    starts: sim.markers.filter((m) => m.type === 'inspStart' && m.t > t0).map((m) => ({ x: m.t - t0, color: m.trigger === 'patient' ? 'assist' : 'muted' })),
-  };
-}
-
 export function AsyncPanel({ settings, patient, level, apply, events }: Props) {
   const [active, setActive] = useState<string | null>(null);
   const [saved, setSaved] = useState<{ p: PatientParams; s: VentSettings } | null>(null);
   const [challenge, setChallenge] = useState<{ id: string; guess: string | null } | null>(null);
-  const [showCmp, setShowCmp] = useState(false);
-  const [reveal, setReveal] = useState(false);
-  const cmp = useMemo(() => (showCmp ? { d: offline('stacking'), r: offline('reverse') } : null), [showCmp]);
 
   const activate = (a: Asynchrony) => {
     if (!saved) setSaved({ p: patient, s: settings });
@@ -143,33 +120,6 @@ export function AsyncPanel({ settings, patient, level, apply, events }: Props) {
           ))}
         </div>
       )}
-      <div className="sec">
-        <h3>Doble disparo frente a disparo reverso</h3>
-        <p className="small">
-          Ambos producen dos ciclos seguidos con espiración mínima. La pista en las curvas convencionales es la <b>secuencia</b>: en el doble disparo el primer ciclo lo dispara el paciente (muesca de Paw, marcador morado) y el esfuerzo continúa tras el ciclado; en el disparo reverso el primer ciclo es disparado por máquina (sin muesca, marcador gris) y la deformación aparece después, con latencia constante. Sin presión esofágica o EAdi el origen puede sugerirse, pero no siempre confirmarse: un esfuerzo que comienza muy cerca del disparo por tiempo, o un retraso de disparo largo, hacen ambiguas las curvas.
-        </p>
-        <button onClick={() => setShowCmp((v) => !v)}>{showCmp ? 'Ocultar comparación' : 'Mostrar comparación lado a lado'}</button>
-        {cmp && (
-          <>
-            {level < 3 && (
-              <label className="small row">
-                <input type="checkbox" checked={reveal} onChange={(e) => setReveal(e.target.checked)} /> Revelar Pmus (equivalente a presión esofágica/EAdi)
-              </label>
-            )}
-            {(['d', 'r'] as const).map((k) => (
-              <div key={k} className="sec">
-                <h4>{k === 'd' ? 'A · Doble disparo (VCV, Ti neural largo)' : 'B · Disparo reverso (PCV, arrastre 1:1)'}</h4>
-                <StaticChart className="minichart" xlabel="Tiempo (s)" ylabel="Paw" vlines={cmp[k].starts} series={[{ xs: cmp[k].t, ys: cmp[k].paw, color: 'paw' }, ...(reveal ? [{ xs: cmp[k].t, ys: cmp[k].pmus, color: 'pmus', dash: [5, 3] }] : [])]} />
-                <StaticChart className="minichart" xlabel="Tiempo (s)" ylabel="Flujo (L/min)" vlines={cmp[k].starts} series={[{ xs: cmp[k].t, ys: cmp[k].flow, color: 'flow' }]} />
-              </div>
-            ))}
-            <div className="legend small">
-              <span style={{ ['--c' as string]: 'var(--assist)' }}>inicio de ciclo disparado por paciente</span>
-              <span style={{ ['--c' as string]: 'var(--muted)' }}>inicio de ciclo por tiempo</span>
-            </div>
-          </>
-        )}
-      </div>
     </>
   );
 }

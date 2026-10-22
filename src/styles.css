@@ -112,6 +112,12 @@ h1, h2, h3, h4 { margin: 0; text-wrap: balance; }
 .cursorinfo { position: absolute; right: 8px; top: 6px; background: var(--raised); border: 1px solid var(--line); border-radius: 6px; padding: 4px 8px; font-size: 12px; font-family: var(--f-num); pointer-events: none; white-space: pre; }
 .case-variant { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
 .case-variant select { max-width: 100%; font-size: 13px; }
+.center.loops-collapsed { grid-template-rows: minmax(260px, 1fr) auto auto; }
+.loops-body { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.collapse-btn { width: 26px; height: 24px; padding: 0; display: inline-flex; align-items: center; justify-content: center; }
+.collapse-btn svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; transition: transform 0.15s; }
+.collapse-btn svg.rot { transform: rotate(-90deg); }
+.loops-collapsed .looppane .panebar { border-bottom: none; }
 .midrow { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .asyncbanner { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; background: color-mix(in srgb, var(--warn) 14%, var(--panel)); border: 1px solid var(--warn); border-radius: 8px; padding: 5px 8px; font-size: 13.5px; }
 .asyncbanner.ok { background: color-mix(in srgb, var(--ok) 12%, var(--panel)); border-color: var(--ok); }
@@ -265,6 +271,7 @@ fieldset.item { min-width: 0; }
   .toolbar { flex-direction: row; overflow-x: auto; }
   .tool { flex: 1 0 70px; }
   .center { grid-template-rows: 420px auto 260px; }
+  .center.loops-collapsed { grid-template-rows: 420px auto auto; }
   .valuespane { overflow: visible; }
   .vg-grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
   .therapybar { position: sticky; bottom: 0; z-index: 25; }
@@ -273,6 +280,7 @@ fieldset.item { min-width: 0; }
 @media (max-width: 760px) {
   .sb-alarm { order: 3; flex-basis: 100%; }
   .center { grid-template-rows: 380px auto 440px; }
+  .center.loops-collapsed { grid-template-rows: 380px auto auto; }
   .loops { grid-template-columns: 1fr; }
   .therapy-row { flex-wrap: wrap; gap: 4px; padding: 4px; }
   .modebtn { min-width: 70px; padding: 2px 6px; }
@@ -284,3 +292,4 @@ fieldset.item { min-width: 0; }
   .skey { font-size: 12px; padding: 3px 4px; }
   .knobpanel { width: 100%; }
 }
+@media (prefers-reduced-motion: reduce) { .collapse-btn svg { transition: none; } }
