@@ -43,3 +43,19 @@ describe('calibración con datos de un paciente real', () => {
     expect(Math.abs(row(r, 'VTe').model - 520)).toBeLessThan(60);
   });
 });
+
+describe('asincronía observada en el paciente real', () => {
+  it.each([
+    ['double', 'frecuente', 0.2, 0.55],
+    ['ineffective', 'frecuente', 0.2, 0.55],
+    ['reverse', 'constante', 0.6, 1],
+  ] as const)('%s (%s) se reproduce con la frecuencia pedida sin cambiar el ventilador', (type, severity, lo, hi) => {
+    const r = calibrate({ ...ARDS, asynchrony: { type, severity } });
+    const d = r.derived.find((x) => x.label === 'Asincronía reproducida')!;
+    const pct = parseInt(d.value, 10) / 100;
+    expect(pct).toBeGreaterThanOrEqual(lo);
+    expect(pct).toBeLessThanOrEqual(hi);
+    expect(r.settings.mode).toBe('VCV');
+    expect(r.settings.vt).toBe(410);
+  });
+});

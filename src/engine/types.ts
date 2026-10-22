@@ -79,6 +79,8 @@ export interface EffortParams {
   rtRatio: number; // 1 = 1:1, 2 = 1:2 ...
   variability: number; // coeficiente de variación ciclo a ciclo (0–0.3)
   chemoGain: number; // aumento relativo de impulso por mmHg de PaCO2 (0 = sin control químico)
+  /** esfuerzo alternativo intermitente (asincronía en una fracción de los ciclos) */
+  alt?: { prob: number; pmusMax: number; tiNeural: number; expReflex?: number };
 }
 
 export interface PatientParams {

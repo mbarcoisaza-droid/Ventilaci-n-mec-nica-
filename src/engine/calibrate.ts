@@ -43,7 +43,12 @@ export interface RealPatientInput {
   };
   clinical: { map?: number; hr?: number; hb?: number; icp?: number };
   abg: { ph?: number; paco2?: number; pao2?: number; hco3?: number };
+  /** asincronía observada en el paciente real (opcional) */
+  asynchrony?: { type: string; severity: AsyncSeverity };
 }
+
+export type AsyncSeverity = 'ocasional' | 'frecuente' | 'constante';
+const SEVERITY_TARGET: Record<AsyncSeverity, number> = { ocasional: 0.15, frecuente: 0.35, constante: 0.7 };
 
 export interface CalRow {
   label: string;
@@ -325,6 +330,16 @@ export function calibrate(inp: RealPatientInput): CalibrationResult {
     }
   }
 
+  // ---------- asincronía observada
+  let asyncInfo: { label: string; achieved: number; target: number } | null = null;
+  if (inp.asynchrony && inp.asynchrony.type !== 'none') {
+    const r = injectAsynchrony(p, s, inp.asynchrony.type, inp.asynchrony.severity, initPaco2);
+    Object.assign(p, r.patient);
+    p.effort = r.patient.effort;
+    notes.push(...r.notes);
+    asyncInfo = { label: inp.asynchrony.type, achieved: r.achieved, target: SEVERITY_TARGET[inp.asynchrony.severity] };
+  }
+
   // ---------- verificación final
   const fin = run(p, s, 45, initPaco2);
   const gas = fin.sim.gasEx.gas;
@@ -356,6 +371,175 @@ export function calibrate(inp: RealPatientInput): CalibrationResult {
   );
   const bad = rows.filter((r) => r.measured !== null && Math.abs(r.model - r.measured) > Math.max(2, Math.abs(r.measured) * 0.12) && r.label !== 'pH');
   if (bad.length) notes.push(`No se reprodujo con exactitud: ${bad.map((r) => r.label).join(', ')}. El modelo de un compartimento no siempre puede ajustar todos los datos a la vez; revise que las mediciones sean coherentes (p. ej., Pplat con paciente pasivo).`);
+  if (asyncInfo) derived.push({ label: 'Asincronía reproducida', value: `${Math.round(asyncInfo.achieved * 100)} % de los ciclos (objetivo ≈ ${Math.round(asyncInfo.target * 100)} %)` });
   notes.push('La calibración describe el estado actual; la respuesta a cambios (PEEP, FR…) depende de la forma no lineal del fenotipo elegido y es una predicción del modelo, no del paciente.');
   return { patient: p, settings: s, initPaco2, rows, derived, notes };
+}
+
+// ======================================================================================
+// Reproducción de una asincronía observada
+// ======================================================================================
+
+/**
+ * Sólo se modifica al PACIENTE (la programación del ventilador es la real):
+ *  - asincronías por esfuerzo: un «esfuerzo alternativo» (Pmus, Ti neural, reflejo espiratorio)
+ *    aparece en una fracción de los ciclos; se busca la intensidad que la produce y la fracción
+ *    que reproduce la frecuencia observada;
+ *  - disparo reverso: relación de arrastre (1:1, 1:2, 1:4);
+ *  - autodisparo: fuga u oscilación cardiogénica; atrapamiento: mecánica espiratoria.
+ */
+type AltGen = (p: PatientParams, s: VentSettings, k: number) => { rr: number; alt: { pmusMax: number; tiNeural: number; expReflex?: number } };
+
+const ventTi = (s: VentSettings) => {
+  const ti = Simulator.inspTime(s);
+  return Number.isFinite(ti) ? ti : 0.8;
+};
+const rrFor = (p: PatientParams, s: VentSettings) => Math.max(p.effort.pmusMax > 0 ? p.effort.rr : 0, s.rr + 4, 16);
+
+const EFFORT_GENS: Record<string, AltGen> = {
+  ineffective: (p, s, k) => ({ rr: Math.max(rrFor(p, s), s.rr * 1.5), alt: { pmusMax: 7 / k, tiNeural: 0.9 } }),
+  double: (p, s, k) => ({ rr: rrFor(p, s), alt: { pmusMax: 7 * k, tiNeural: clamp(ventTi(s) * 2.4, 1.0, 2.2) } }),
+  stacking: (p, s, k) => ({ rr: rrFor(p, s), alt: { pmusMax: 10 * k, tiNeural: clamp(ventTi(s) * 2.6, 1.1, 2.4) } }),
+  lateTrigger: (p, s, k) => ({ rr: rrFor(p, s), alt: { pmusMax: 8 / k, tiNeural: 1.4 } }),
+  prematureCycle: (p, s, k) => ({ rr: rrFor(p, s), alt: { pmusMax: 5 * k, tiNeural: Math.max(1.1, ventTi(s) * 1.7) } }),
+  delayedCycle: (p, s, k) => ({ rr: rrFor(p, s), alt: { pmusMax: 6, tiNeural: clamp(ventTi(s) * 0.45, 0.35, 0.8), expReflex: 4 * k } }),
+  flowStarvation: (p, s, k) => ({ rr: rrFor(p, s), alt: { pmusMax: 7 * k, tiNeural: Math.max(0.8, ventTi(s)) } }),
+  flowAsync: (p, s, k) => ({ rr: rrFor(p, s), alt: { pmusMax: 7 * k, tiNeural: 0.9 } }),
+};
+
+const OTHER_GENS: Record<string, (p: PatientParams, s: VentSettings, k: number) => PatientParams> = {
+  autotrigger: (p, s, k) =>
+    s.triggerType === 'pressure'
+      ? { ...p, cardiacAmp: k * 0.9 * s.pressureTrigger, hr: Math.max(p.hr, 100) }
+      : { ...p, leak: k * 1.3 * s.flowTrigger * Math.sqrt(10 / Math.max(s.peep, 3)), leakSite: 'airway' },
+  airTrapping: (p, _s, k) => ({ ...p, rExp: p.rExp * (1 + 2 * k), eflRus: Math.max(p.eflRus, 25) * (1 + k), eflPcrit: p.eflRus > 0 ? p.eflPcrit : 1 }),
+  flowExcess: (p) => p,
+};
+
+const INTENSITIES = [0.35, 0.5, 0.7, 0.9, 1.2, 1.6, 2.1, 2.8, 3.6, 4.8, 6];
+const RT_RATIO: Record<AsyncSeverity, number> = { ocasional: 5, frecuente: 2, constante: 1 };
+
+function asyncFraction(p: PatientParams, s: VentSettings, type: string, initPaco2?: number): number {
+  const sim = new Simulator(s, p, { initPaco2 });
+  sim.advance(40);
+  const t0 = sim.t - 30;
+  const breaths = sim.breaths.filter((b) => b.tStart > t0).length;
+  if (type === 'ineffective') {
+    const ineff = sim.drive.efforts.filter((e) => e.onset > t0 && e.onset < sim.t - 2 && !e.triggered && !e.reverse).length;
+    return breaths + ineff ? ineff / (breaths + ineff) : 0;
+  }
+  const n = sim.asyncEvents.filter((e) => e.t > t0 && e.type === type).length;
+  // el disparo reverso se refiere a los ciclos disparados por máquina (los que lo provocan)
+  const denom = type === 'reverse' ? sim.breaths.filter((b) => b.tStart > t0 && b.trigger === 'machine').length : breaths;
+  return denom ? Math.min(1, n / denom) : 0;
+}
+
+export function injectAsynchrony(
+  base: PatientParams,
+  s: VentSettings,
+  type: string,
+  severity: AsyncSeverity,
+  initPaco2?: number,
+): { patient: PatientParams; achieved: number; notes: string[] } {
+  const notes: string[] = [];
+  const target = SEVERITY_TARGET[severity];
+  const ps = ['PSV', 'CPAP', 'VS', 'BILEVEL'].includes(s.mode);
+  let patient = base;
+  let achieved = 0;
+
+  // ¿el paciente calibrado ya la presenta con la programación actual?
+  const f0 = type === 'flowExcess' ? 0 : asyncFraction(base, s, type, initPaco2);
+  if (f0 >= target * 0.8) {
+    notes.push(`El paciente calibrado ya presenta esta asincronía en el ${Math.round(f0 * 100)} % de los ciclos con la programación actual: no se añadió nada.`);
+    return { patient: base, achieved: f0, notes };
+  }
+
+  if (type === 'reverse') {
+    patient = {
+      ...base,
+      effort: { ...base.effort, pmusMax: 0, alt: undefined, reverseTrigger: true, rtAmp: 9, rtDelay: clamp(0.55 * ventTi(s), 0.3, 1), tiNeural: 0.9, rtRatio: RT_RATIO[severity], variability: 0.05 },
+    };
+    achieved = asyncFraction(patient, s, 'reverse', initPaco2);
+    if (ps) notes.push('El disparo reverso se describe en ciclos disparados por máquina; en modos espontáneos el modelo sólo lo genera durante la ventilación de respaldo.');
+  } else if (EFFORT_GENS[type]) {
+    const gen = EFFORT_GENS[type];
+    // 1) intensidad que produce la asincronía en casi todos los esfuerzos alternativos
+    // la menor intensidad suficiente, con Pmus limitada a valores fisiológicos (≤ 25 cmH₂O)
+    const genC = (k: number) => {
+      const g = gen(base, s, k);
+      return { ...g, alt: { ...g.alt, pmusMax: clamp(g.alt.pmusMax, 1, 25) } };
+    };
+    let best = { k: INTENSITIES[0], f: -1 };
+    const enough = Math.min(0.8, target * 1.5);
+    for (const k of INTENSITIES) {
+      const g = genC(k);
+      const cand = { ...base, effort: { ...base.effort, reverseTrigger: false, chemoGain: 0, variability: 0.06, rr: g.rr, alt: { prob: 1, ...g.alt } } };
+      const f = asyncFraction(cand, s, type, initPaco2);
+      if (f > best.f + 0.02) best = { k, f };
+      if (f >= enough || g.alt.pmusMax >= 25 || g.alt.pmusMax <= 1) break;
+    }
+    // 2) fracción de ciclos con el esfuerzo alternativo para alcanzar la frecuencia observada
+    const g = genC(best.k);
+    const mk = (pr: number): PatientParams => ({ ...base, effort: { ...base.effort, reverseTrigger: false, chemoGain: 0, variability: 0.06, rr: g.rr, alt: { prob: pr, ...g.alt } } });
+    // bisección sobre la fracción de esfuerzos alternativos (la relación no es lineal)
+    let lo = 0.05;
+    let hi = 1;
+    let prob = 1;
+    let closest = { prob: 1, f: best.f, err: Math.abs(best.f - target) };
+    if (best.f > target) {
+      for (let i = 0; i < 6; i++) {
+        const mid = (lo + hi) / 2;
+        const fm = asyncFraction(mk(mid), s, type, initPaco2);
+        if (Math.abs(fm - target) < closest.err) closest = { prob: mid, f: fm, err: Math.abs(fm - target) };
+        if (fm < target) lo = mid;
+        else hi = mid;
+      }
+    }
+    prob = closest.prob;
+    patient = mk(prob);
+    achieved = closest.f;
+    if (g.alt.pmusMax >= 18)
+      notes.push(`Con esta mecánica y programación hace falta un esfuerzo intenso (Pmus ≈ ${g.alt.pmusMax.toFixed(0)} cmH₂O) para producirla: ${type === 'double' || type === 'stacking' ? 'el segundo disparo exige vencer el retroceso elástico tele-inspiratorio' : 'el flujo programado cubre buena parte de la demanda'}. Un esfuerzo así implica alto riesgo de P-SILI.`);
+    notes.push(`Asincronía generada con un esfuerzo de ${g.alt.pmusMax.toFixed(1)} cmH₂O y Ti neural ${g.alt.tiNeural.toFixed(2)} s en el ${Math.round(prob * 100)} % de los ciclos neurales (panel Paciente para ver el resto del esfuerzo).`);
+  } else if (OTHER_GENS[type]) {
+    const gen = OTHER_GENS[type];
+    let best = { f: -1, p: base };
+    if (type !== 'flowExcess') {
+      for (const k of INTENSITIES) {
+        const cand = gen(base, s, k);
+        const f = asyncFraction(cand, s, type, initPaco2);
+        if (f > best.f) best = { f, p: cand };
+        if (f >= target) {
+          best = { f, p: cand };
+          break;
+        }
+      }
+    } else best = { f: asyncFraction(base, s, type, initPaco2), p: base };
+    patient = best.p;
+    achieved = Math.max(0, best.f);
+    if (type === 'airTrapping') notes.push('Si introdujo la PEEP total medida, la auto-PEEP ya estaba calibrada: añadir atrapamiento la eleva por encima de lo medido.');
+  } else {
+    return { patient: base, achieved: 0, notes: [`Asincronía «${type}» no reconocida.`] };
+  }
+
+  if (achieved < target * 0.5) {
+    const hint: Record<string, string> = {
+      ineffective: 'sin auto-PEEP ni sensibilidad baja el modelo dispara incluso con esfuerzos débiles',
+      autotrigger: 'compruebe la sensibilidad de disparo y la compensación de fugas',
+      double: ps ? 'en PSV el ciclado por flujo acompaña al esfuerzo; suele requerir ETS alto o soporte bajo' : 'el Ti mecánico ya es largo respecto al esfuerzo',
+      stacking: ps ? 'en PSV el ciclado por flujo acompaña al esfuerzo; suele requerir ETS alto o soporte bajo' : 'el Ti mecánico ya es largo respecto al esfuerzo',
+      lateTrigger: 'suele requerir auto-PEEP o disparo por presión poco sensible',
+      prematureCycle: ps ? 'depende de un ETS alto y una constante de tiempo corta' : 'el Ti mecánico ya cubre el esfuerzo',
+      delayedCycle: ps ? 'depende de un ETS bajo y una constante de tiempo larga' : 'el Ti mecánico es corto',
+      flowStarvation: 'sólo aparece en VCV con flujo bajo para la demanda',
+      flowAsync: 'sólo aparece en modos por presión con rampa lenta o soporte bajo',
+      flowExcess: 'depende de la programación: rampa de 0 s en modos por presión o flujo > 90 L/min con Ti corto',
+      airTrapping: 'la constante de tiempo es corta para el tiempo espiratorio programado',
+    };
+    notes.push(`Con esta programación la asincronía sólo se reproduce en el ${Math.round(achieved * 100)} % de los ciclos${hint[type] ? ` (${hint[type]})` : ''}.`);
+  }
+  if (achieved > target * 1.6 && (type === 'autotrigger' || type === 'airTrapping'))
+    notes.push(`Esta asincronía no admite un ajuste fino de frecuencia en el modelo: aparece en el ${Math.round(achieved * 100)} % de los ciclos.`);
+  if (EFFORT_GENS[type]) notes.push('El esfuerzo añadido modifica el Vte y los gases respecto a la calibración sin asincronía; la tabla compara con el estado final.');
+  return { patient, achieved, notes };
 }

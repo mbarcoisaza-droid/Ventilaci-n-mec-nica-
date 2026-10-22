@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react';
 import type { ModeId, VentSettings } from '../../engine/types';
 import { DEFAULT_SETTINGS, PHENOTYPE_LIST } from '../../engine/presets';
 import { MODES, MODE_BY_ID } from '../../education/modes';
-import { calibrate, type CalibrationResult, type RealPatientInput } from '../../engine/calibrate';
+import { calibrate, type AsyncSeverity, type CalibrationResult, type RealPatientInput } from '../../engine/calibrate';
+import { ASYNCHRONIES } from '../../education/asynchronies';
 import { predictedBodyWeight } from '../../engine/mechanics';
 
 type Form = Record<string, string>;
@@ -34,6 +35,7 @@ const EMPTY: Form = {
   ppeak: '', pplat: '', peepTotal: '', vte: '', rrTotal: '', rInsp: '', p01: '', pocc: '', pesEI: '', pesEE: '',
   map: '', hr: '', hb: '', icp: '',
   ph: '', paco2: '', pao2: '', hco3: '',
+  asyncType: 'none', asyncSeverity: 'frecuente',
 };
 
 /** Ejemplo ficticio (no corresponde a ningún paciente real) */
@@ -96,6 +98,7 @@ function toInput(f: Form): { inp: RealPatientInput | null; errors: string[] } {
       measured: { ppeak: num(f.ppeak), pplat: num(f.pplat), peepTotal: num(f.peepTotal), vte: num(f.vte), rrTotal: num(f.rrTotal), rInsp: num(f.rInsp), p01: num(f.p01), pocc: num(f.pocc), pesEI: num(f.pesEI), pesEE: num(f.pesEE) },
       clinical: { map: num(f.map), hr: num(f.hr), hb: num(f.hb), icp: num(f.icp) },
       abg: { ph, paco2: num(f.paco2), pao2: num(f.pao2), hco3: num(f.hco3) },
+      asynchrony: f.asyncType && f.asyncType !== 'none' ? { type: f.asyncType, severity: (f.asyncSeverity || 'frecuente') as AsyncSeverity } : undefined,
     },
   };
 }
@@ -272,6 +275,39 @@ export function RealPatientPanel({ onApply }: Props) {
         {num(f.pao2) && num(f.fio2) ? <p className="small muted">PaO₂/FiO₂ = {(num(f.pao2)! / (num(f.fio2)! / 100)).toFixed(0)}</p> : null}
       </fieldset>
 
+      <fieldset className="rp-sec">
+        <legend>5 · Asincronía observada (opcional)</legend>
+        <div className="rp-grid">
+          <label className="rp-field rp-wide" htmlFor="rp-async">
+            <span className="rp-lab">Tipo</span>
+            <select id="rp-async" value={f.asyncType || 'none'} onChange={(e) => set('asyncType')(e.target.value)}>
+              <option value="none">Ninguna</option>
+              {ASYNCHRONIES.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
+            </select>
+          </label>
+          {f.asyncType && f.asyncType !== 'none' && (
+            <label className="rp-field rp-wide" htmlFor="rp-async-sev">
+              <span className="rp-lab">Frecuencia observada</span>
+              <select id="rp-async-sev" value={f.asyncSeverity || 'frecuente'} onChange={(e) => set('asyncSeverity')(e.target.value)}>
+                <option value="ocasional">Ocasional (≈ 10–20 % de los ciclos)</option>
+                <option value="frecuente">Frecuente (≈ 30–50 %)</option>
+                <option value="constante">Casi todos los ciclos (≥ 70 %)</option>
+              </select>
+            </label>
+          )}
+        </div>
+        {(() => {
+          const a = ASYNCHRONIES.find((x) => x.id === f.asyncType);
+          if (!a) return <p className="rp-hint">Si en el paciente real observa una asincronía, elíjala: el programa la reproduce modificando sólo el comportamiento del paciente (esfuerzo, fuga o mecánica), porque la programación del ventilador es la real.</p>;
+          return (
+            <div className="small" style={{ marginTop: 6 }}>
+              <div className="muted">Signos para confirmarla en las curvas:</div>
+              <ul className="tight">{a.signs.map((x) => <li key={x}>{x}</li>)}</ul>
+            </div>
+          );
+        })()}
+      </fieldset>
+
       {errors.length > 0 && <div className="note warn small">{errors.map((e) => <div key={e}>{e}</div>)}</div>}
       <button className="primary" onClick={submit} disabled={busy}>{busy ? 'Calibrando el modelo…' : 'Calcular y graficar'}</button>
 
@@ -308,7 +344,10 @@ export function RealPatientPanel({ onApply }: Props) {
           </dl>
           <h4>Supuestos y advertencias</h4>
           <ul className="tight small">{result.notes.map((n) => <li key={n}>{n}</li>)}</ul>
-          <div className="note small">El paciente calibrado ya está cargado: ajuste el ventilador en la barra inferior y observe la respuesta. Use «Guardar» para conservar la configuración.</div>
+          <div className="note small">
+            El paciente calibrado ya está cargado: ajuste el ventilador en la barra inferior y observe la respuesta. Use «Guardar» para conservar la configuración.
+            {f.asyncType && f.asyncType !== 'none' ? ' Active «Esfuerzos» y «Pmus/Pes» en la barra de curvas para ver el origen de la asincronía; el módulo Asincronías muestra el detector y las correcciones posibles.' : ''}
+          </div>
         </div>
       )}
 

@@ -501,13 +501,8 @@ export class Simulator {
     this.acc.pOverEI = this.el.pOver;
     this.acc.pElEI = this.el.pEl - this.mech.p2;
     this.markers.push({ t, type: 'inspEnd' });
-    // detección de ciclado prematuro / tardío (verdad del modelo)
-    const eff = this.drive.currentEffort(this.breathStart) ?? this.drive.currentEffort(t);
-    if (eff && eff.pmax > 0.3 && !eff.reverse && this.kind !== 'APRV') {
-      const neuralEnd = eff.onset + eff.ti;
-      if (neuralEnd - t > 0.25 && this.trig === 'patient') this.pushAsync('prematureCycle');
-      else if (t - neuralEnd > 0.35 && eff.onset <= this.breathStart + 0.05) this.pushAsync('delayedCycle');
-    }
+    const hasPause = this.kind === 'VC' && this.plan.pause > 0 && this.pendingManeuver !== 'inspHold';
+    if (!hasPause) this.checkCycleAsync(t);
     if (this.pendingManeuver === 'inspHold' && this.kind !== 'APRV') {
       this.pendingManeuver = null;
       this.phase = 'holdI';
@@ -523,6 +518,16 @@ export class Simulator {
       return;
     }
     this.goExp(reason);
+  }
+
+  /** Ciclado prematuro / tardío respecto al esfuerzo neural (verdad del modelo), al terminar la insuflación. */
+  private checkCycleAsync(t: number) {
+    const eff = this.drive.currentEffort(this.breathStart) ?? this.drive.currentEffort(t);
+    if (eff && eff.pmax > 0.3 && !eff.reverse && this.kind !== 'APRV') {
+      const neuralEnd = eff.onset + eff.ti;
+      if (neuralEnd - t > 0.25 && this.trig === 'patient') this.pushAsync('prematureCycle');
+      else if (t - neuralEnd > 0.35 && eff.onset <= this.breathStart + 0.05) this.pushAsync('delayedCycle');
+    }
   }
 
   private goExp(_reason: string) {
@@ -1034,6 +1039,7 @@ export class Simulator {
           const stable = this.plateauShape(Math.min(0.3, this.plan.pause * 0.6)).stable;
           this.acc.pplat = this.paw;
           this.acc.inspEnd = this.t;
+          this.checkCycleAsync(this.t);
           this.acc.pplatStable = stable && this.holdPmusMax < 1 && this.plan.pause >= 0.2;
           this.goExp('fin de pausa');
         }

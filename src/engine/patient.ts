@@ -57,11 +57,12 @@ export class PatientDrive {
     return 1 + e.variability * Math.max(-2, Math.min(2, this.rng.gauss()));
   }
 
-  private startEffort(t: number, e: EffortParams, pmax: number, reverse: boolean) {
+  private startEffort(t: number, e: EffortParams, pmax: number, reverse: boolean, tiOverride?: number) {
     this.onset = t;
-    this.ti = Math.max(0.3, e.tiNeural * (reverse ? 1 : this.jitter(e)));
+    this.ti = Math.max(0.3, (tiOverride ?? e.tiNeural) * (reverse ? 1 : this.jitter(e)));
     this.pmax = pmax;
     this.reverse = reverse;
+    if (pmax < 0.3) return; // ciclo sin esfuerzo (paciente pasivo con esfuerzo intermitente)
     this.efforts.push({
       onset: t,
       ti: this.ti,
@@ -84,6 +85,7 @@ export class PatientDrive {
     }
   }
   private pendingReverse = false;
+  private altActive = false;
 
   /** Ventilador en inspiración/pausa (para el reflejo espiratorio). */
   pmus(t: number, e: EffortParams, ventInspiring: boolean): number {
@@ -93,9 +95,12 @@ export class PatientDrive {
         this.pendingReverse = false;
         this.startEffort(t, e, e.rtAmp, true);
       }
-    } else if (e.pmusMax > 0 && t >= this.nextOnset) {
-      const pm = Math.min(40, e.pmusMax * this.chemo * this.jitter(e));
-      this.startEffort(t, e, Math.max(0, pm), false);
+    } else if ((e.pmusMax > 0 || (e.alt && e.alt.prob > 0)) && t >= this.nextOnset) {
+      const useAlt = !!e.alt && this.rng.next() < e.alt.prob;
+      this.altActive = useAlt;
+      const base = useAlt ? e.alt!.pmusMax : e.pmusMax;
+      const pm = Math.min(40, base * this.chemo * this.jitter(e));
+      this.startEffort(t, e, Math.max(0, pm), false, useAlt ? e.alt!.tiNeural : undefined);
       const rate = Math.max(4, Math.min(50, e.rr * Math.sqrt(this.chemo)));
       this.nextOnset = t + (60 / rate) * this.jitter(e);
     }
@@ -114,10 +119,11 @@ export class PatientDrive {
     }
     // Reflejo espiratorio ante insuflación prolongada
     const neuralEnd = this.onset + this.ti;
-    if (e.expReflex > 0 && this.pmax > 0 && ventInspiring && t > neuralEnd + 0.15 && t - this.onset < 6) {
+    const reflex = this.altActive && e.alt?.expReflex !== undefined ? e.alt.expReflex : e.expReflex;
+    if (reflex > 0 && this.pmax > 0 && ventInspiring && t > neuralEnd + 0.15 && t - this.onset < 6) {
       if (this.reflexStart === null) this.reflexStart = t;
       this.reflexRelease = null;
-      this.reflexLevel = e.expReflex * Math.min(1, (t - this.reflexStart) / 0.25);
+      this.reflexLevel = reflex * Math.min(1, (t - this.reflexStart) / 0.25);
     } else if (this.reflexStart !== null) {
       if (this.reflexRelease === null) this.reflexRelease = t;
       const lvl = this.reflexLevel * Math.exp(-(t - this.reflexRelease) / 0.12);
