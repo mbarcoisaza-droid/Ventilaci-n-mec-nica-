@@ -16,6 +16,8 @@
   --flow: #3fe0a0;
   --vol: #68b8ff;
   --pmus: #d48cff;
+  --assist: #a35bff; /* ciclo disparado por el paciente (asistido) */
+  --assist-fill: rgba(163, 91, 255, 0.16);
   --ptp: #ff8c66;
   --gas: #9fd6e8;
   --ok: #2fd08a;
@@ -63,6 +65,8 @@ h1, h2, h3, h4 { margin: 0; text-wrap: balance; }
 .sb-left { display: flex; align-items: center; gap: 10px; min-width: 0; }
 .sb-brand { font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; font-size: 13px; color: var(--muted); }
 .sb-mode { background: var(--accent); color: #031019; font-weight: 700; border-radius: 5px; padding: 2px 10px; font-size: 16px; letter-spacing: 0.02em; }
+.sb-trig { background: var(--assist); color: #fff; font-weight: 700; font-size: 12px; border-radius: 5px; padding: 3px 8px; letter-spacing: 0.04em; text-transform: uppercase; }
+.sb-trig.off { background: transparent; color: var(--muted); border: 1px solid var(--line); font-weight: 600; }
 .sb-pt { font-size: 14px; color: var(--fg); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .sb-alarm { flex: 1; min-width: 220px; display: flex; align-items: center; gap: 8px; justify-content: center; border-radius: 6px; padding: 4px 10px; background: var(--raised); border: 1px solid var(--line); min-height: 34px; }
 .sb-alarm.high { background: var(--crit); border-color: var(--crit); color: #fff; animation: blink 1.4s steps(2, start) infinite; }
@@ -93,6 +97,8 @@ h1, h2, h3, h4 { margin: 0; text-wrap: balance; }
 .panebar { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; padding: 4px 6px; border-bottom: 1px solid var(--line); font-size: 13px; }
 .panebar select, .panebar button { font-size: 12.5px; padding: 2px 7px; }
 .panetitle { font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
+.assist-key { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; color: var(--muted); }
+.assist-key::before { content: ''; width: 0; height: 0; border-left: 5px solid transparent; border-right: 5px solid transparent; border-top: 8px solid var(--assist); }
 .panehint { margin-left: auto; font-size: 12px; color: var(--muted); }
 .chk { display: inline-flex; align-items: center; gap: 4px; font-size: 13px; }
 .waves, .loops { position: relative; flex: 1; min-height: 0; }

@@ -182,6 +182,15 @@ export default function App() {
         <div className="sb-left">
           <span className="sb-brand">Ventilab</span>
           <span className="sb-mode">{modeShort}</span>
+          {(() => {
+            const last = [...sim.markers].reverse().find((x) => x.type === 'inspStart');
+            const recent = last && last.trigger === 'patient' && sim.t - last.t < 1;
+            return (
+              <span className={'sb-trig' + (recent ? '' : ' off')} title="Se ilumina cuando el paciente dispara el ciclo (ciclo asistido)">
+                Disparo paciente
+              </span>
+            );
+          })()}
           <span className="sb-pt">
             Adulto · PBW <b className="num">{sim.pbw.toFixed(0)}</b> kg · {activeCase ? activeCase.title : level === 3 ? 'paciente sin identificar' : sim.patient.label}
           </span>
@@ -254,6 +263,7 @@ export default function App() {
                 <label className="chk"><input type="checkbox" checked={showEfforts} onChange={(e) => setShowEfforts(e.target.checked)} /> Esfuerzos</label>
               </>
             )}
+            <span className="assist-key">disparo del paciente (asistido)</span>
             <span className="panehint">clic: cursores A/B</span>
           </div>
           <Waveforms ctl={ctl} win={win} scales={scales} showModel={showModel} showEfforts={showEff} frozen={frozen} />

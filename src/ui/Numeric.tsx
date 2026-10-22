@@ -56,6 +56,7 @@ export function Values({ m, g, fio2, showModel, showIcp }: Props) {
         <Val big tone="vol" k="VT / PBW" u="mL/kg" v={nb ? '—' : f(m.vtPerKg, 1)} />
         <Val tone="vol" k="VM" u="L/min" v={f(m.mv, 1)} />
         <Val tone="vol" k="FR tot / esp" u="/min" v={`${f(m.rrTotal)} / ${f(m.rrSpont)}`} />
+        <Val wide tone="assist" k="Disparo paciente" u="% ciclos" v={nb ? '—' : f(m.patientTriggeredPct)} s="asistidos + espontáneos" />
       </Group>
       <Group title="Mecánica">
         <Val tone="flow" k="Cstat / Cdin" u="mL/cmH₂O" v={`${f(m.cstat)} / ${f(m.cdyn)}`} badge={m.cstat === null ? MAN : undefined} />

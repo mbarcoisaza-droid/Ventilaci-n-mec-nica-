@@ -15,6 +15,8 @@ export function palette() {
     flow: cssVar('--flow'),
     vol: cssVar('--vol'),
     pmus: cssVar('--pmus'),
+    assist: cssVar('--assist'),
+    assistFill: cssVar('--assist-fill'),
     ptp: cssVar('--ptp'),
     insp: cssVar('--insp'),
     ref: cssVar('--ref'),

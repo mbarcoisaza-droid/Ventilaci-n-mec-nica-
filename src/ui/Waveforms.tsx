@@ -82,6 +82,20 @@ export function Waveforms({ ctl, win, scales, showModel, showEfforts, frozen }: 
         }
       }
 
+      // inspiraciones disparadas por el paciente (asistidas): sombreado y franja morados
+      const starts = s.markers.filter((m) => m.type === 'inspStart');
+      const ends = s.markers.filter((m) => m.type === 'inspEnd');
+      const assisted: [number, number][] = [];
+      for (const m of starts) {
+        if (m.trigger !== 'patient') continue;
+        const e = ends.find((x) => x.t > m.t);
+        const tEndIns = e ? e.t : tEnd;
+        if (tEndIns < t0) continue;
+        assisted.push([Math.max(m.t, t0), Math.min(tEndIns, tEnd)]);
+      }
+      ctx.fillStyle = P.assistFill;
+      for (const [a, b] of assisted) ctx.fillRect(X(a), T, X(b) - X(a), rowH * 3);
+
       const chans: { key: 'paw' | 'flow' | 'vol'; buf: Float32Array; color: string; unit: string; label: string; zero: boolean }[] = [
         { key: 'paw', buf: s.bpaw, color: P.paw, unit: 'cmH₂O', label: 'Paw', zero: true },
         { key: 'flow', buf: s.bflow, color: P.flow, unit: 'L/min', label: 'Flujo', zero: true },
@@ -224,19 +238,33 @@ export function Waveforms({ ctl, win, scales, showModel, showEfforts, frozen }: 
         ctx.fillText(`${c.label} (${c.unit})`, L + 6, y0 + 4);
       });
 
-      // marcadores de ciclo y esfuerzos
-      for (const m of s.markers) {
-        if (m.t < t0 || m.type !== 'inspStart') continue;
+      // franja superior en el panel de presión durante las inspiraciones asistidas
+      ctx.fillStyle = P.assist;
+      for (const [a, b] of assisted) ctx.fillRect(X(a), T, Math.max(2, X(b) - X(a)), 4);
+      // marcadores de inicio de ciclo: morado relleno = disparo del paciente; gris hueco = por tiempo
+      for (const m of starts) {
+        if (m.t < t0) continue;
         const x = X(m.t);
-        ctx.fillStyle = m.trigger === 'patient' ? P.accent : P.muted;
+        const pat = m.trigger === 'patient';
         ctx.beginPath();
-        ctx.moveTo(x - 5, T + rowH * 3 + 1);
-        ctx.lineTo(x + 5, T + rowH * 3 + 1);
-        ctx.lineTo(x, T + rowH * 3 + 9);
+        ctx.moveTo(x - (pat ? 6 : 5), T + rowH * 3 + 1);
+        ctx.lineTo(x + (pat ? 6 : 5), T + rowH * 3 + 1);
+        ctx.lineTo(x, T + rowH * 3 + (pat ? 11 : 9));
         ctx.closePath();
-        if (m.trigger === 'patient') ctx.fill();
-        else {
+        if (pat) {
+          ctx.fillStyle = P.assist;
+          ctx.fill();
+          ctx.strokeStyle = P.assist;
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.moveTo(x, T);
+          ctx.lineTo(x, T + rowH * 3);
+          ctx.globalAlpha = 0.5;
+          ctx.stroke();
+          ctx.globalAlpha = 1;
+        } else {
           ctx.strokeStyle = P.muted;
+          ctx.lineWidth = 1;
           ctx.stroke();
         }
       }

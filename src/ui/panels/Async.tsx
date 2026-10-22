@@ -43,7 +43,7 @@ function offline(id: string) {
     paw: idx.map((i) => sim.bpaw[i]),
     flow: idx.map((i) => sim.bflow[i]),
     pmus: idx.map((i) => sim.bpmus[i]),
-    starts: sim.markers.filter((m) => m.type === 'inspStart' && m.t > t0).map((m) => ({ x: m.t - t0, color: m.trigger === 'patient' ? 'accent' : 'muted' })),
+    starts: sim.markers.filter((m) => m.type === 'inspStart' && m.t > t0).map((m) => ({ x: m.t - t0, color: m.trigger === 'patient' ? 'assist' : 'muted' })),
   };
 }
 
@@ -146,7 +146,7 @@ export function AsyncPanel({ settings, patient, level, apply, events }: Props) {
       <div className="sec">
         <h3>Doble disparo frente a disparo reverso</h3>
         <p className="small">
-          Ambos producen dos ciclos seguidos con espiración mínima. La pista en las curvas convencionales es la <b>secuencia</b>: en el doble disparo el primer ciclo lo dispara el paciente (muesca de Paw, marcador relleno) y el esfuerzo continúa tras el ciclado; en el disparo reverso el primer ciclo es disparado por máquina (sin muesca, marcador hueco) y la deformación aparece después, con latencia constante. Sin presión esofágica o EAdi el origen puede sugerirse, pero no siempre confirmarse: un esfuerzo que comienza muy cerca del disparo por tiempo, o un retraso de disparo largo, hacen ambiguas las curvas.
+          Ambos producen dos ciclos seguidos con espiración mínima. La pista en las curvas convencionales es la <b>secuencia</b>: en el doble disparo el primer ciclo lo dispara el paciente (muesca de Paw, marcador morado) y el esfuerzo continúa tras el ciclado; en el disparo reverso el primer ciclo es disparado por máquina (sin muesca, marcador gris) y la deformación aparece después, con latencia constante. Sin presión esofágica o EAdi el origen puede sugerirse, pero no siempre confirmarse: un esfuerzo que comienza muy cerca del disparo por tiempo, o un retraso de disparo largo, hacen ambiguas las curvas.
         </p>
         <button onClick={() => setShowCmp((v) => !v)}>{showCmp ? 'Ocultar comparación' : 'Mostrar comparación lado a lado'}</button>
         {cmp && (
@@ -164,7 +164,7 @@ export function AsyncPanel({ settings, patient, level, apply, events }: Props) {
               </div>
             ))}
             <div className="legend small">
-              <span style={{ ['--c' as string]: 'var(--accent)' }}>inicio de ciclo disparado por paciente</span>
+              <span style={{ ['--c' as string]: 'var(--assist)' }}>inicio de ciclo disparado por paciente</span>
               <span style={{ ['--c' as string]: 'var(--muted)' }}>inicio de ciclo por tiempo</span>
             </div>
           </>

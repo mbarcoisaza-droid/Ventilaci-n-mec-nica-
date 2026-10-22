@@ -201,6 +201,7 @@ export interface Monitor {
   adaptiveP: number;
   rsbi: number | null;
   noBreath: boolean; // sin ciclos completos en los últimos 30 s
+  patientTriggeredPct: number; // % de ciclos disparados por el paciente (asistidos o espontáneos)
 }
 
 export class Simulator {
@@ -1399,6 +1400,7 @@ export class Simulator {
       adaptiveP: this.adaptiveP,
       rsbi: rrTotal > 0 && vteMean > 0 ? rrTotal / (vteMean / 1000) : null,
       noBreath: recent.length === 0,
+      patientTriggeredPct: lastN.length ? (100 * lastN.filter((b) => b.trigger === 'patient').length) / lastN.length : 0,
     };
   }
 
