@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { Controller } from './controller';
-import { autoRange, cssVar, glowStroke, niceStep, palette, useCanvas } from './canvas';
+import { autoRange, cssVar, glowStroke, niceStep, palette, ScaleKeeper, useCanvas } from './canvas';
 import type { FrozenTrace, ScaleSet } from './Waveforms';
 
 /**
@@ -29,6 +29,8 @@ export function SweepWaveforms({ ctl, win, scales, showModel, showEfforts, froze
   const [cursors, setCursors] = useState<number[]>([]);
   const cur = useRef<number[]>([]);
   cur.current = cursors;
+  const keeper = useRef(new ScaleKeeper());
+  const simRef = useRef(ctl.sim);
   const props = useRef({ win, scales, showModel, showEfforts, frozen });
   props.current = { win, scales, showModel, showEfforts, frozen };
 
@@ -48,6 +50,11 @@ export function SweepWaveforms({ ctl, win, scales, showModel, showEfforts, froze
         vol: cssVar('--mon-vol'),
       };
       const s = ctl.sim;
+      if (simRef.current !== s) {
+        // nueva simulación (caso, paciente real, reinicio): se recalculan las escalas
+        simRef.current = s;
+        keeper.current.reset();
+      }
       const now = s.t;
       const gap = Math.max(0.25, win * 0.03);
       const pw = w - L - R;
@@ -107,6 +114,7 @@ export function SweepWaveforms({ ctl, win, scales, showModel, showEfforts, froze
             if (c.key === 'vol' && mn > -0.05 * mx) mn = 0;
             [lo, hi] = autoRange(mn, mx);
           }
+          [lo, hi] = keeper.current.get(c.key, lo, hi, performance.now() / 1000);
         }
         const Y = (v: number) => bot - ((v - lo) / (hi - lo)) * (bot - top);
         const yZero = lo <= 0 && hi >= 0 ? Y(0) : bot;

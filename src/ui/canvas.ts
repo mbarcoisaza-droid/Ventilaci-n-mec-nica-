@@ -93,11 +93,11 @@ export function autoRange(min: number, max: number, includeZero = true): [number
 }
 
 /**
- * Trazo suavizado: curvas cuadráticas con control en cada muestra y paso por los puntos medios.
- * Redondea las esquinas entre muestras (≤ 1 intervalo de registro, 10 ms) sin desplazar los datos,
- * de modo que los cambios bruscos reales (disparo, ciclado, apertura de válvula) se conservan.
+ * Interpolación cúbica monótona (Fritsch–Carlson): la curva pasa exactamente por cada muestra,
+ * es continua en pendiente y no crea sobreimpulsos ni oscilaciones que no estén en los datos.
+ * Así se suaviza el trazo sin «inventar» fisiología: un escalón real sigue siendo un escalón.
  */
-export function smoothPath(ctx: CanvasRenderingContext2D, xs: number[], ys: number[]) {
+export function monotonePath(ctx: CanvasRenderingContext2D | Path2D, xs: number[], ys: number[]) {
   const n = xs.length;
   if (n === 0) return;
   ctx.moveTo(xs[0], ys[0]);
@@ -109,34 +109,144 @@ export function smoothPath(ctx: CanvasRenderingContext2D, xs: number[], ys: numb
     ctx.lineTo(xs[1], ys[1]);
     return;
   }
-  for (let i = 1; i < n - 1; i++) {
-    const mx = (xs[i] + xs[i + 1]) / 2;
-    const my = (ys[i] + ys[i + 1]) / 2;
-    ctx.quadraticCurveTo(xs[i], ys[i], mx, my);
+  const d: number[] = new Array(n - 1);
+  const h: number[] = new Array(n - 1);
+  for (let i = 0; i < n - 1; i++) {
+    h[i] = xs[i + 1] - xs[i];
+    d[i] = h[i] > 1e-6 ? (ys[i + 1] - ys[i]) / h[i] : 0;
   }
-  ctx.lineTo(xs[n - 1], ys[n - 1]);
+  const m: number[] = new Array(n);
+  m[0] = d[0];
+  m[n - 1] = d[n - 2];
+  for (let i = 1; i < n - 1; i++) {
+    if (d[i - 1] * d[i] <= 0) m[i] = 0;
+    else {
+      // media armónica ponderada (Fritsch–Butland): garantiza monotonía por tramos
+      const w1 = 2 * h[i] + h[i - 1];
+      const w2 = h[i] + 2 * h[i - 1];
+      m[i] = (w1 + w2) / (w1 / d[i - 1] + w2 / d[i]);
+    }
+  }
+  for (let i = 0; i < n - 1; i++) {
+    if (h[i] <= 1e-6) {
+      ctx.lineTo(xs[i + 1], ys[i + 1]);
+      continue;
+    }
+    const k = h[i] / 3;
+    ctx.bezierCurveTo(xs[i] + k, ys[i] + m[i] * k, xs[i + 1] - k, ys[i + 1] - m[i + 1] * k, xs[i + 1], ys[i + 1]);
+  }
 }
 
-/** Trazo «luminoso» de monitor: halo tenue y núcleo de grosor uniforme, con uniones redondeadas. */
+/**
+ * Cuando hay más de ~1.5 muestras por píxel (ventanas largas) se reduce a mínimo y máximo por
+ * columna de píxeles, en orden temporal: conserva picos y valles y evita el temblor (aliasing)
+ * que produce el barrido al desplazar el muestreo respecto a la rejilla de píxeles.
+ */
+export function decimate(xs: number[], ys: number[]): { xs: number[]; ys: number[]; dense: boolean } {
+  const n = xs.length;
+  if (n < 3) return { xs, ys, dense: false };
+  const span = Math.abs(xs[n - 1] - xs[0]);
+  if (n / Math.max(span, 1) < 1.5) return { xs, ys, dense: false };
+  const ox: number[] = [];
+  const oy: number[] = [];
+  let col = Math.floor(xs[0]);
+  let minY = ys[0];
+  let maxY = ys[0];
+  let minFirst = true;
+  let firstX = xs[0];
+  const flush = () => {
+    if (minFirst) {
+      ox.push(firstX, firstX + 0.5);
+      oy.push(minY, maxY);
+    } else {
+      ox.push(firstX, firstX + 0.5);
+      oy.push(maxY, minY);
+    }
+  };
+  for (let i = 1; i < n; i++) {
+    const c = Math.floor(xs[i]);
+    if (c !== col) {
+      flush();
+      col = c;
+      minY = maxY = ys[i];
+      minFirst = true;
+      firstX = xs[i];
+      continue;
+    }
+    if (ys[i] < minY) {
+      minY = ys[i];
+      minFirst = false;
+    }
+    if (ys[i] > maxY) {
+      maxY = ys[i];
+      minFirst = true;
+    }
+  }
+  flush();
+  return { xs: ox, ys: oy, dense: true };
+}
+
+/** Calidad adaptativa: el halo se desactiva si la animación no alcanza ~45 fps (ver Controller). */
+let glowEnabled = true;
+export function setGlowEnabled(v: boolean) {
+  glowEnabled = v;
+}
+
+/** Trazo de monitor: halo de fósforo aditivo y núcleo de grosor uniforme, con uniones redondeadas.
+ *  El trazado se construye una sola vez (Path2D) y se reutiliza para el halo y el núcleo. */
 export function glowStroke(ctx: CanvasRenderingContext2D, pieces: { xs: number[]; ys: number[] }[], color: string, width: number, dash: number[] = [], glow = true) {
+  const path = new Path2D();
+  for (const piece of pieces) {
+    const p = decimate(piece.xs, piece.ys);
+    if (!p.xs.length) continue;
+    if (p.dense) {
+      path.moveTo(p.xs[0], p.ys[0]);
+      for (let i = 1; i < p.xs.length; i++) path.lineTo(p.xs[i], p.ys[i]);
+    } else monotonePath(path, p.xs, p.ys);
+  }
   ctx.save();
   ctx.lineJoin = 'round';
   ctx.lineCap = 'round';
   ctx.strokeStyle = color;
   ctx.setLineDash(dash);
-  const path = () => {
-    ctx.beginPath();
-    for (const p of pieces) smoothPath(ctx, p.xs, p.ys);
-  };
-  if (glow && !dash.length) {
-    ctx.globalAlpha = 0.26;
-    ctx.lineWidth = width * 2.3;
-    path();
-    ctx.stroke();
+  if (glow && glowEnabled && !dash.length) {
+    // halo tenue (composición normal: mucho más barata que la aditiva y casi idéntica sobre negro)
+    ctx.globalAlpha = 0.24;
+    ctx.lineWidth = width * 2.2;
+    ctx.stroke(path);
     ctx.globalAlpha = 1;
   }
   ctx.lineWidth = width;
-  path();
-  ctx.stroke();
+  ctx.stroke(path);
   ctx.restore();
+}
+
+/**
+ * Escala automática estable: se amplía de inmediato cuando la señal la excede y sólo se reduce
+ * cuando la señal ocupa < 45 % del rango durante más de 4 s. Evita que las curvas «salten»
+ * en cada fotograma, como hacen los ventiladores reales.
+ */
+export class ScaleKeeper {
+  private st = new Map<string, { lo: number; hi: number; smallSince: number | null }>();
+  get(key: string, lo: number, hi: number, now: number): [number, number] {
+    const c = this.st.get(key);
+    if (!c || lo < c.lo - 1e-9 || hi > c.hi + 1e-9) {
+      const lo2 = c ? Math.min(lo, c.lo) : lo;
+      const hi2 = c ? Math.max(hi, c.hi) : hi;
+      this.st.set(key, { lo: lo2, hi: hi2, smallSince: null });
+      return [lo2, hi2];
+    }
+    const used = (hi - lo) / (c.hi - c.lo);
+    if (used < 0.45) {
+      if (c.smallSince === null) c.smallSince = now;
+      else if (now - c.smallSince > 4) {
+        this.st.set(key, { lo, hi, smallSince: null });
+        return [lo, hi];
+      }
+    } else c.smallSince = null;
+    return [c.lo, c.hi];
+  }
+  reset() {
+    this.st.clear();
+  }
 }

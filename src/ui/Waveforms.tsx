@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { Controller } from './controller';
-import { autoRange, niceStep, palette, useCanvas } from './canvas';
+import { autoRange, glowStroke, niceStep, palette, ScaleKeeper, useCanvas } from './canvas';
 
 export interface FrozenTrace {
   label: string;
@@ -46,6 +46,8 @@ export function Waveforms({ ctl, win, scales, showModel, showEfforts, frozen }: 
   const [cursors, setCursors] = useState<number[]>([]);
   const cur = useRef<number[]>([]);
   cur.current = cursors;
+  const keeper = useRef(new ScaleKeeper());
+  const simRef = useRef(ctl.sim);
   const props = useRef({ win, scales, showModel, showEfforts, frozen });
   props.current = { win, scales, showModel, showEfforts, frozen };
 
@@ -57,6 +59,11 @@ export function Waveforms({ ctl, win, scales, showModel, showEfforts, frozen }: 
       const { win, scales, showModel, showEfforts, frozen } = props.current;
       const P = palette();
       const s = ctl.sim;
+      if (simRef.current !== s) {
+        // nueva simulación (caso, paciente real, reinicio): se recalculan las escalas
+        simRef.current = s;
+        keeper.current.reset();
+      }
       ctx.clearRect(0, 0, w, h);
       ctx.lineJoin = 'round';
       ctx.lineCap = 'round';
@@ -134,6 +141,7 @@ export function Waveforms({ ctl, win, scales, showModel, showEfforts, frozen }: 
             const m = Math.max(Math.abs(mn), Math.abs(mx), 20);
             [lo, hi] = autoRange(-m, m);
           } else [lo, hi] = autoRange(mn, mx);
+          [lo, hi] = keeper.current.get(c.key, lo, hi, performance.now() / 1000);
         }
         ranges.push([lo, hi]);
         const Y = (v: number) => y0 + rowH - ((v - lo) / (hi - lo)) * rowH;
@@ -207,17 +215,8 @@ export function Waveforms({ ctl, win, scales, showModel, showEfforts, frozen }: 
             ctx.setLineDash([]);
           }
         }
-        // curva
-        ctx.strokeStyle = c.color;
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        idx.forEach((i, k) => {
-          const x = X(s.bt[i]);
-          const y = Y(c.buf[i]);
-          if (k === 0) ctx.moveTo(x, y);
-          else ctx.lineTo(x, y);
-        });
-        ctx.stroke();
+        // curva (interpolación monótona, sin halo en el estilo consola)
+        glowStroke(ctx, [{ xs: idx.map((i) => X(s.bt[i])), ys: idx.map((i) => Y(c.buf[i])) }], c.color, 2, [], false);
         // tramo de disparo del paciente en morado
         const segs = trigSegs.filter((g) => g.chan === c.key);
         if (segs.length) {
