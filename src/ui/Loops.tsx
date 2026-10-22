@@ -86,6 +86,8 @@ export function Loops({ ctl, history, showModel, frozen }: Props) {
         if (!g) return;
         const { ctx, w, h } = g;
         ctx.clearRect(0, 0, w, h);
+        ctx.lineJoin = 'round';
+        ctx.lineCap = 'round';
         const L = 44;
         const R = 10;
         const T = 22;
@@ -164,7 +166,8 @@ export function Loops({ ctl, history, showModel, frozen }: Props) {
       panel(fv, (d) => d.vol, (d) => d.flow, vr, [-fm, fm], 'Volumen (mL)', 'Flujo (L/min)', P.flow);
     };
     return ctl.subscribe(draw);
-  }, [ctl, pv, fv]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ctl, pv.get, fv.get]);
 
   return (
     <div className="loops">

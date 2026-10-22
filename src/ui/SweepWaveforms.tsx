@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { Controller } from './controller';
-import { autoRange, cssVar, niceStep, palette, useCanvas } from './canvas';
+import { autoRange, cssVar, glowStroke, niceStep, palette, useCanvas } from './canvas';
 import type { FrozenTrace, ScaleSet } from './Waveforms';
 
 /**
@@ -163,52 +163,47 @@ export function SweepWaveforms({ ctl, win, scales, showModel, showEfforts, froze
         // referencia congelada
         if (frozen) {
           const arr = frozen[c.key];
-          ctx.strokeStyle = P.ref;
-          ctx.setLineDash([4, 3]);
-          ctx.lineWidth = 1.2;
-          ctx.beginPath();
           // misma posición de barrido que tenía al congelarse
+          const pieces: { xs: number[]; ys: number[] }[] = [];
           let prev = -1;
           frozen.t.forEach((tt, k) => {
             const p = pos(frozen.t0 + tt);
-            const x = L + (p / win) * pw;
-            if (k === 0 || p < prev) ctx.moveTo(x, Y(arr[k]));
-            else ctx.lineTo(x, Y(arr[k]));
+            if (k === 0 || p < prev) pieces.push({ xs: [], ys: [] });
+            pieces[pieces.length - 1].xs.push(L + (p / win) * pw);
+            pieces[pieces.length - 1].ys.push(Y(arr[k]));
             prev = p;
           });
-          ctx.stroke();
+          glowStroke(ctx, pieces, P.ref, 1.3, [4, 3], false);
           ctx.setLineDash([]);
         }
-        const trace = (buf: Float32Array, color: string, width: number, dash: number[] = [], range?: [number, number]) => {
-          ctx.strokeStyle = color;
-          ctx.lineWidth = width;
-          ctx.setLineDash(dash);
-          ctx.beginPath();
+        // tramos continuos del barrido (se cortan en el hueco de borrado y al volver al inicio)
+        const trace = (buf: Float32Array, color: string, width: number, dash: number[] = [], range?: [number, number], glow = true) => {
+          const pieces: { xs: number[]; ys: number[] }[] = [];
+          let cur: { xs: number[]; ys: number[] } | null = null;
           let prevPos = -1;
-          let pen = false;
           for (const i of idx) {
             const tt = s.bt[i];
             if (!visible(tt) || (range && (tt < range[0] || tt > range[1]))) {
-              pen = false;
+              cur = null;
               continue;
             }
             const p = pos(tt);
-            const x = L + (p / win) * pw;
-            const y = Y(buf[i]);
-            if (!pen || p < prevPos) ctx.moveTo(x, y);
-            else ctx.lineTo(x, y);
-            pen = true;
+            if (!cur || p < prevPos) {
+              cur = { xs: [], ys: [] };
+              pieces.push(cur);
+            }
+            cur.xs.push(L + (p / win) * pw);
+            cur.ys.push(Y(buf[i]));
             prevPos = p;
           }
-          ctx.stroke();
-          ctx.setLineDash([]);
+          glowStroke(ctx, pieces, color, width, dash, glow);
         };
         if (showModel && c.key === 'paw') {
-          trace(s.bpmus, P.pmus, 1.2, [5, 3]);
-          trace(s.bppl, P.ptp, 1.2, [5, 3]);
+          trace(s.bpmus, P.pmus, 1.3, [5, 3], undefined, false);
+          trace(s.bppl, P.ptp, 1.3, [5, 3], undefined, false);
         }
-        trace(c.buf, c.color, 2);
-        for (const sg of trigSegs) if (sg.chan === c.key) trace(c.buf, P.assist, 3.6, [], [sg.a, sg.b]);
+        trace(c.buf, c.color, 2.2);
+        for (const sg of trigSegs) if (sg.chan === c.key) trace(c.buf, P.assist, 3.4, [], [sg.a, sg.b]);
         ctx.restore();
       });
 

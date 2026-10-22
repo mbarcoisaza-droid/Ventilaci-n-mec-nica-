@@ -58,6 +58,8 @@ export function Waveforms({ ctl, win, scales, showModel, showEfforts, frozen }: 
       const P = palette();
       const s = ctl.sim;
       ctx.clearRect(0, 0, w, h);
+      ctx.lineJoin = 'round';
+      ctx.lineCap = 'round';
       const L = 46;
       const R = 10;
       const B = 20;
