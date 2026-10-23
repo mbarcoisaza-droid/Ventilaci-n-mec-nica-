@@ -181,6 +181,19 @@ describe('atrapamiento aéreo', () => {
     expect(Math.abs(m.value - model)).toBeLessThan(1.5);
   });
 
+  it('pausa espiratoria se ejecuta aunque el paciente dispare todos los ciclos (A/C asistida)', () => {
+    const p = { ...PHENOTYPES.ardsMild, effort: { ...PHENOTYPES.ardsMild.effort, pmusMax: 8, rr: 24, tiNeural: 0.9, chemoGain: 0 } };
+    const sim = new Simulator(S({ mode: 'VCV', rr: 12, vt: 420, peakFlow: 60, pause: 0, peep: 8 }), p);
+    sim.advance(20);
+    expect(sim.monitor().patientTriggeredPct).toBeGreaterThan(80);
+    sim.requestManeuver('expHold');
+    sim.advance(6);
+    expect(sim.pendingManeuver).toBeNull();
+    const m = sim.lastManeuver('expHold')!;
+    expect(m).toBeTruthy();
+    expect(m.valid).toBe(false); // el esfuerzo durante la oclusión invalida la medida
+  });
+
   it('el flujo telespiratorio es ≠ 0 cuando hay auto-PEEP', () => {
     const sim = new Simulator(S({ mode: 'VCV', rr: 25, vt: 500, peakFlow: 50, pause: 0, peep: 0 }), PHENOTYPES.copd);
     sim.advance(40);

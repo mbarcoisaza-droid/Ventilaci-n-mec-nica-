@@ -730,6 +730,10 @@ export class Simulator {
       valid = false;
       notes.push(`Verificación del modelo: actividad muscular durante la oclusión (|Pmus| máx. ${this.holdPmusMax.toFixed(1)} cmH₂O). La espiración activa sobrestima la auto-PEEP; un esfuerzo inspiratorio la subestima.`);
     }
+    if (this.patient.leak > 0.5) {
+      valid = false;
+      notes.push('Fuga presente: la presión cae durante la oclusión y la PEEP total se subestima.');
+    }
     const auto = ptot - s.peep;
     this.maneuvers.push({
       kind: 'expHold',
@@ -1188,14 +1192,21 @@ export class Simulator {
       return false;
     })();
 
+    // la pausa espiratoria ocluye al final de la espiración: en el siguiente ciclo programado o, si el
+    // paciente dispara antes (A/C asistida, PSV), en el momento del disparo (el esfuerzo queda registrado
+    // como deflexión durante la oclusión y la medida se marca como no fiable)
+    let trig: boolean | null = null;
     if (this.pendingManeuver === 'expHold') {
-      const ready = machineDue || (!this.isMandatoryMode() && tExp > 1.2);
+      trig = this.detectTrigger(tExp);
+      const ready = machineDue || trig || (!this.isMandatoryMode() && tExp > 1.2);
       if (ready) {
         this.pendingManeuver = null;
         this.phase = 'holdE';
         this.phaseStart = t;
         this.holdPmusMax = 0;
         this.holdStartPaw = this.paw;
+        this.trigPendingAt = null;
+        this.trigDetectAt = null;
         return;
       }
     }
@@ -1207,7 +1218,7 @@ export class Simulator {
       return;
     }
 
-    if (this.detectTrigger(tExp)) {
+    if (trig ?? this.detectTrigger(tExp)) {
       if (mode === 'VCV' || mode === 'PCV' || mode === 'PRVC') {
         this.startBreath(this.mandatoryKind(), 'patient', true);
       } else if (mode === 'SIMV_VC' || mode === 'SIMV_PC') {
