@@ -1485,6 +1485,12 @@ export class Simulator {
     return { pct: Math.round(100 * (1 - asyncCycles / br.length)), cycles: br.length, asyncCycles, window: w };
   }
 
+  /** Asincronía (%) = % de ciclos con asincronía en la ventana (complemento de syncStats). */
+  asyncStats(windowSec = 30, minSec = 10, focus?: string): { pct: number; cycles: number; asyncCycles: number; window: number } {
+    const st = this.syncStats(windowSec, minSec, focus);
+    return { ...st, pct: st.cycles ? 100 - st.pct : 0 };
+  }
+
   toCSV(w: number): string {
     const rows = ['t_s,paw_cmH2O,flow_Lmin,vol_mL,pmus_cmH2O,ppl_cmH2O,ptp_cmH2O,palv_cmH2O,phase'];
     for (const i of this.window(w)) {

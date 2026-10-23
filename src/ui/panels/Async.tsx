@@ -11,9 +11,11 @@ interface Props {
   level: 1 | 2 | 3;
   apply: (p: PatientParams, s: VentSettings, warm?: number) => void;
   events: Record<string, number>;
+  /** asincronía en estudio (para el % del panel de valores) */
+  onFocus: (id: string | null) => void;
 }
 
-/** Estado del laboratorio: asincronía activa, pasos aplicados y % de sincronía medido antes de cada paso. */
+/** Estado del laboratorio: asincronía activa, pasos aplicados y % de asincronía medido antes de cada paso. */
 interface Lab {
   id: string;
   applied: number;
@@ -39,30 +41,6 @@ function Detail({ a, revealName }: { a: Asynchrony; revealName: boolean }) {
   );
 }
 
-/** Indicador de sincronía (%) en vivo para la asincronía estudiada. */
-function SyncMeter({ sim, focus, name }: { sim: Simulator; focus: string; name: string }) {
-  const st = sim.syncStats(30, 0, focus);
-  const measuring = st.cycles < MIN_CYCLES;
-  const pct = st.pct;
-  const tone = measuring ? '' : pct >= 90 ? ' ok' : pct >= 50 ? ' mid' : ' bad';
-  return (
-    <div className={'syncmeter' + tone} role="status" aria-live="polite">
-      <div className="sm-head">
-        <span className="sm-title">Sincronía paciente-ventilador</span>
-        <span className="sm-val">{measuring ? 'midiendo…' : `${pct} %`}</span>
-      </div>
-      <div className="sm-bar" aria-hidden="true">
-        <div className="sm-fill" style={{ width: `${measuring ? 0 : pct}%` }} />
-      </div>
-      <div className="sm-foot small muted">
-        {measuring
-          ? 'Esperando ciclos con la programación actual.'
-          : `${st.asyncCycles} de ${st.cycles} ciclos con ${name.toLowerCase()} · últimos ${Math.round(st.window)} s`}
-      </div>
-    </div>
-  );
-}
-
 /** Otras asincronías mayores presentes en la ventana (p. ej. las inducidas por una corrección). */
 function OtherAsync({ sim, focus }: { sim: Simulator; focus: string }) {
   const from = sim.t - Math.min(30, Math.max(0, sim.t - sim.lastChange));
@@ -82,12 +60,14 @@ function OtherAsync({ sim, focus }: { sim: Simulator; focus: string }) {
 
 function StepResolver({ sim, a, lab, onStep, onAll }: { sim: Simulator; a: Asynchrony; lab: Lab; onStep: () => void; onAll: () => void }) {
   const steps = RESOLVE_STEPS[a.id] ?? [];
-  const st = sim.syncStats(30, 0, a.id);
+  const st = sim.asyncStats(30, 0, a.id);
   const measuring = st.cycles < MIN_CYCLES;
   const done = lab.applied >= steps.length;
   return (
     <div className="sec">
-      <SyncMeter sim={sim} focus={a.id} name={a.name} />
+      <p className="small">
+        <b>Asincronía</b> (% de ciclos con {a.name.toLowerCase()}): se muestra en el panel de valores, bajo «Disparo paciente».
+      </p>
       <div className="sync-history small">
         {lab.history.map((h, i) => (
           <span key={i} className="sh-chip">
@@ -121,17 +101,17 @@ function StepResolver({ sim, a, lab, onStep, onAll }: { sim: Simulator; a: Async
       </ol>
       <div className="row">
         {!done && <button onClick={onAll}>Resolver todo de una vez</button>}
-        {done && !measuring && st.pct >= 90 && <span className="note small">Sincronía restablecida. Compare las curvas con las del inicio.</span>}
-        {done && !measuring && st.pct < 90 && <span className="note warn small">Aún hay ciclos asincrónicos: espere unos ciclos o revise la causa.</span>}
+        {done && !measuring && st.pct <= 10 && <span className="note small">Asincronía resuelta. Compare las curvas con las del inicio.</span>}
+        {done && !measuring && st.pct > 10 && <span className="note warn small">Aún hay ciclos asincrónicos: espere unos ciclos o revise la causa.</span>}
       </div>
       <p className="small muted">
-        Aplique un paso, observe varios ciclos y vea cómo sube el % de sincronía. Cada paso sigue el manejo propuesto en la revisión de referencia; el último deja al paciente sincrónico.
+        Aplique un paso, observe varios ciclos y vea cómo baja el % de asincronía. Cada paso sigue el manejo propuesto en la revisión de referencia; el último deja al paciente sincrónico.
       </p>
     </div>
   );
 }
 
-export function AsyncPanel({ sim, settings, patient, level, apply, events }: Props) {
+export function AsyncPanel({ sim, settings, patient, level, apply, events, onFocus }: Props) {
   const [lab, setLab] = useState<Lab | null>(null);
   const [saved, setSaved] = useState<{ p: PatientParams; s: VentSettings } | null>(null);
   const [challenge, setChallenge] = useState<{ id: string; guess: string | null } | null>(null);
@@ -141,9 +121,10 @@ export function AsyncPanel({ sim, settings, patient, level, apply, events }: Pro
     const { patient: p, settings: s } = buildPreset(a.activate, settings);
     apply(p, s, 8);
     setLab({ id: a.id, applied: 0, history: [] });
+    onFocus(a.id);
   };
   const measured = (id: string) => {
-    const st = sim.syncStats(30, 0, id);
+    const st = sim.asyncStats(30, 0, id);
     return st.cycles < MIN_CYCLES ? null : st.pct;
   };
   const nextStep = (a: Asynchrony) => {
@@ -167,6 +148,7 @@ export function AsyncPanel({ sim, settings, patient, level, apply, events }: Pro
     if (saved) apply(saved.p, saved.s);
     setSaved(null);
     setLab(null);
+    onFocus(null);
     setChallenge(null);
   };
   const startChallenge = () => {
@@ -182,7 +164,7 @@ export function AsyncPanel({ sim, settings, patient, level, apply, events }: Pro
       <div className="sec">
         <h3>Asincronías paciente-ventilador</h3>
         <p className="small muted">
-          Al activarla, la asincronía aparece en todos los ciclos (sincronía ≈ 0 %). Resuélvala paso a paso y observe cómo mejora el porcentaje. Identifíquela con Paw, flujo y volumen; la Pmus del modelo puede mostrarse en niveles 1–2 para confirmar el mecanismo.
+          Al activarla, la asincronía aparece en todos los ciclos (asincronía ≈ 100 %). Resuélvala paso a paso y observe cómo baja el porcentaje en el panel de valores. Identifíquela con Paw, flujo y volumen; la Pmus del modelo puede mostrarse en niveles 1–2 para confirmar el mecanismo.
         </p>
         <div className="row">
           <button className="primary" onClick={startChallenge}>Desafío: asincronía aleatoria</button>
@@ -231,7 +213,6 @@ export function AsyncPanel({ sim, settings, patient, level, apply, events }: Pro
                 </div>
                 {active && lab && level === 3 && (
                   <>
-                    <SyncMeter sim={sim} focus={a.id} name="asincronía" />
                     <button onClick={() => nextStep(a)} disabled={lab.applied >= (RESOLVE_STEPS[a.id]?.length ?? 0)}>
                       Aplicar siguiente corrección
                     </button>

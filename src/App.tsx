@@ -9,6 +9,7 @@ import { MODE_BY_ID } from './education/modes';
 import { ManeuversPanel } from './ui/panels/Maneuvers';
 import { PatientPanel } from './ui/panels/Patient';
 import { AsyncPanel } from './ui/panels/Async';
+import { ASYNC_EVENT_LABEL } from './education/asynchronies';
 import { CasesPanel } from './ui/panels/Cases';
 import { TheoryPanel } from './ui/panels/Theory';
 import { ConfigPanel } from './ui/panels/Config';
@@ -51,6 +52,7 @@ export default function App() {
   }
   const ctl = ctlRef.current;
   const [, setTick] = useState(0);
+  const [asyncFocus, setAsyncFocus] = useState<string | null>(null);
   const [settings, setSettingsState] = useState<VentSettings>(INIT_SETTINGS);
   const [patient, setPatientState] = useState<PatientParams>(INIT_PATIENT);
   const [level, setLevel] = useState<1 | 2 | 3>(1);
@@ -155,6 +157,7 @@ export default function App() {
   );
 
   const loadCase = (c: ClinicalCase, asyncOpt?: { type: string; severity: AsyncSeverity } | null) => {
+    setAsyncFocus(null);
     const b = buildCase(c);
     let caseAsync = null as null | { type: string; severity: AsyncSeverity };
     if (asyncOpt && asyncOpt.type !== 'none') {
@@ -180,6 +183,7 @@ export default function App() {
   };
 
   const loadRealPatient = (r: CalibrationResult) => {
+    setAsyncFocus(null);
     ctl.replace(r.settings, r.patient, { initPaco2: r.initPaco2 }, 15);
     setSettingsState(r.settings);
     setPatientState(r.patient);
@@ -206,6 +210,7 @@ export default function App() {
 
   /** Vuelve a la configuración inicial de la aplicación para empezar otro caso. */
   const newSession = () => {
+    setAsyncFocus(null);
     ctl.replace(INIT_SETTINGS, INIT_PATIENT, {}, 12);
     setSettingsState(INIT_SETTINGS);
     setPatientState(INIT_PATIENT);
@@ -429,7 +434,7 @@ export default function App() {
       </main>
 
       <aside className="valuespane">
-        <Values m={m} g={g} fio2={settings.fio2} showModel={level < 3} showIcp={sim.patient.icpBase > 0} />
+        <Values m={m} g={g} fio2={settings.fio2} showModel={level < 3} showIcp={sim.patient.icpBase > 0} asyn={{ ...sim.asyncStats(30, 0, asyncFocus ?? undefined), label: asyncFocus && level < 3 ? ASYNC_EVENT_LABEL[asyncFocus] ?? null : null }} />
       </aside>
 
       <footer className="therapybar">
@@ -469,7 +474,7 @@ export default function App() {
                 addCustom={(c) => setCustomCases((l) => [...l.filter((x) => x.id !== c.id), c])}
               />
             )}
-            {tab === 'asincronias' && <AsyncPanel sim={sim} settings={settings} patient={patient} level={level} apply={apply} events={events} />}
+            {tab === 'asincronias' && <AsyncPanel sim={sim} settings={settings} patient={patient} level={level} apply={apply} events={events} onFocus={setAsyncFocus} />}
             {tab === 'maniobras' && <ManeuversPanel ctl={ctl} m={m} showModel={level < 3} tick={sim.t} />}
             {tab === 'paciente' && (
               <PatientPanel

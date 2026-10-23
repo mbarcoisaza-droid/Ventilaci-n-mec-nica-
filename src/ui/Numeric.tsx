@@ -8,7 +8,7 @@ const MOD: Badge = ['modelo', 'b-model'];
 const MAN: Badge = ['maniobra', 'b-man'];
 
 /** Valor medido al estilo de un ventilador: rótulo y unidad arriba, cifra grande alineada a la derecha. */
-function Val({ k, v, u, s, badge, big, tone, wide }: { k: string; v: string; u?: string; s?: string; badge?: Badge; big?: boolean; tone?: string; wide?: boolean }) {
+function Val({ k, v, u, s, badge, big, tone, wide, bar }: { k: string; v: string; u?: string; s?: string; badge?: Badge; big?: boolean; tone?: string; wide?: boolean; bar?: number }) {
   return (
     <div className={'val' + (big ? ' big' : '') + (wide ? ' wide' : '')} style={tone ? ({ ['--tone' as string]: `var(--${tone})` } as React.CSSProperties) : undefined}>
       <div className="val-head">
@@ -16,6 +16,11 @@ function Val({ k, v, u, s, badge, big, tone, wide }: { k: string; v: string; u?:
         {badge ? <span className={'badge ' + badge[1]}>{badge[0]}</span> : <span className="val-u">{u}</span>}
       </div>
       <div className="val-v num">{v}</div>
+      {bar !== undefined && (
+        <div className="val-bar" aria-hidden="true">
+          <div style={{ width: `${Math.max(0, Math.min(100, bar))}%` }} />
+        </div>
+      )}
       {(s || (badge && u)) && <div className="val-s">{badge && u ? <span className="val-u">{u}</span> : null}{s ? <span>{s}</span> : null}</div>}
     </div>
   );
@@ -36,9 +41,11 @@ interface Props {
   fio2: number;
   showModel: boolean;
   showIcp: boolean;
+  /** % de ciclos con asincronía (ventana reciente); `label` = asincronía estudiada, si la hay */
+  asyn: { pct: number; cycles: number; asyncCycles: number; window: number; label: string | null };
 }
 
-export function Values({ m, g, fio2, showModel, showIcp }: Props) {
+export function Values({ m, g, fio2, showModel, showIcp, asyn }: Props) {
   const nb = m.noBreath;
   return (
     <div className="values" aria-label="Valores medidos">
@@ -57,6 +64,16 @@ export function Values({ m, g, fio2, showModel, showIcp }: Props) {
         <Val tone="vol" k="VM" u="L/min" v={f(m.mv, 1)} />
         <Val tone="vol" k="FR tot / esp" u="/min" v={`${f(m.rrTotal)} / ${f(m.rrSpont)}`} />
         <Val wide tone="assist" k="Disparo paciente" u="% ciclos" v={nb ? '—' : f(m.patientTriggeredPct)} s="asistidos + espontáneos" />
+        <Val
+          wide
+          big
+          tone={asyn.cycles < 2 ? 'muted' : asyn.pct > 50 ? 'crit' : asyn.pct > 10 ? 'warn' : 'ok'}
+          k={asyn.label ? `Asincronía · ${asyn.label}` : 'Asincronía'}
+          u="% ciclos"
+          v={asyn.cycles < 2 ? '—' : f(asyn.pct)}
+          bar={asyn.cycles < 2 ? 0 : asyn.pct}
+          s={asyn.cycles < 2 ? 'midiendo…' : `${asyn.asyncCycles} de ${asyn.cycles} ciclos · últimos ${f(asyn.window)} s · > 10 % = grave`}
+        />
       </Group>
       <Group title="Mecánica">
         <Val tone="flow" k="Cstat / Cdin" u="mL/cmH₂O" v={`${f(m.cstat)} / ${f(m.cdyn)}`} badge={m.cstat === null ? MAN : undefined} />
