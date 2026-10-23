@@ -9,7 +9,7 @@ import { MODE_BY_ID } from './education/modes';
 import { ManeuversPanel } from './ui/panels/Maneuvers';
 import { PatientPanel } from './ui/panels/Patient';
 import { AsyncPanel } from './ui/panels/Async';
-import { ASYNC_EVENT_LABEL } from './education/asynchronies';
+import { ASYNCHRONIES } from './education/asynchronies';
 import { CasesPanel } from './ui/panels/Cases';
 import { TheoryPanel } from './ui/panels/Theory';
 import { ConfigPanel } from './ui/panels/Config';
@@ -52,7 +52,12 @@ export default function App() {
   }
   const ctl = ctlRef.current;
   const [, setTick] = useState(0);
-  const [asyncFocus, setAsyncFocus] = useState<string | null>(null);
+  const [asyncFocus, setAsyncFocusState] = useState<string | null>(null);
+  const [asyncFocusHidden, setAsyncFocusHidden] = useState(false);
+  const setAsyncFocus = (id: string | null, hidden = false) => {
+    setAsyncFocusState(id);
+    setAsyncFocusHidden(hidden);
+  };
   const [settings, setSettingsState] = useState<VentSettings>(INIT_SETTINGS);
   const [patient, setPatientState] = useState<PatientParams>(INIT_PATIENT);
   const [level, setLevel] = useState<1 | 2 | 3>(1);
@@ -434,7 +439,7 @@ export default function App() {
       </main>
 
       <aside className="valuespane">
-        <Values m={m} g={g} fio2={settings.fio2} showModel={level < 3} showIcp={sim.patient.icpBase > 0} asyn={{ ...sim.asyncStats(30, 0, asyncFocus ?? undefined), label: asyncFocus && level < 3 ? ASYNC_EVENT_LABEL[asyncFocus] ?? null : null }} />
+        <Values m={m} g={g} fio2={settings.fio2} showModel={level < 3} showIcp={sim.patient.icpBase > 0} asyn={{ ...sim.asyncStats(30, 0, asyncFocus ?? undefined), label: asyncFocus && !asyncFocusHidden ? ASYNCHRONIES.find((x) => x.id === asyncFocus)?.name ?? null : null }} />
       </aside>
 
       <footer className="therapybar">

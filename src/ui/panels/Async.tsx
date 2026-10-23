@@ -12,7 +12,7 @@ interface Props {
   apply: (p: PatientParams, s: VentSettings, warm?: number) => void;
   events: Record<string, number>;
   /** asincronía en estudio (para el % del panel de valores) */
-  onFocus: (id: string | null) => void;
+  onFocus: (id: string | null, hidden?: boolean) => void;
 }
 
 /** Estado del laboratorio: asincronía activa, pasos aplicados y % de asincronía medido antes de cada paso. */
@@ -116,12 +116,12 @@ export function AsyncPanel({ sim, settings, patient, level, apply, events, onFoc
   const [saved, setSaved] = useState<{ p: PatientParams; s: VentSettings } | null>(null);
   const [challenge, setChallenge] = useState<{ id: string; guess: string | null } | null>(null);
 
-  const activate = (a: Asynchrony) => {
+  const activate = (a: Asynchrony, hidden = false) => {
     if (!saved) setSaved({ p: patient, s: settings });
     const { patient: p, settings: s } = buildPreset(a.activate, settings);
     apply(p, s, 8);
     setLab({ id: a.id, applied: 0, history: [] });
-    onFocus(a.id);
+    onFocus(a.id, hidden);
   };
   const measured = (id: string) => {
     const st = sim.asyncStats(30, 0, id);
@@ -153,10 +153,9 @@ export function AsyncPanel({ sim, settings, patient, level, apply, events, onFoc
   };
   const startChallenge = () => {
     const a = ASYNCHRONIES[Math.floor(Math.random() * ASYNCHRONIES.length)];
-    activate(a);
+    activate(a, true); // el tipo se revela al responder
     setChallenge({ id: a.id, guess: null });
   };
-  const hideNames = level === 3 || (challenge && !challenge.guess);
   const evList = Object.entries(events).filter(([, n]) => n > 0);
 
   return (
@@ -179,7 +178,10 @@ export function AsyncPanel({ sim, settings, patient, level, apply, events, onFoc
       {challenge && (
         <div className="item sel">
           <span className="ttl">¿Qué asincronía observa?</span>
-          <select aria-label="Diagnóstico de la asincronía" value={challenge.guess ?? ''} onChange={(e) => setChallenge({ ...challenge, guess: e.target.value })}>
+          <select aria-label="Diagnóstico de la asincronía" value={challenge.guess ?? ''} onChange={(e) => {
+              setChallenge({ ...challenge, guess: e.target.value });
+              onFocus(challenge.id, false);
+            }}>
             <option value="" disabled>Elija un diagnóstico…</option>
             {ASYNCHRONIES.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
           </select>
@@ -188,7 +190,9 @@ export function AsyncPanel({ sim, settings, patient, level, apply, events, onFoc
             const a = ASYNCHRONIES.find((x) => x.id === challenge.id)!;
             return (
               <>
-                <div className={'note ' + (ok ? '' : 'warn')}>{ok ? 'Correcto' : 'No es correcto'}: era <b>{a.name}</b>.</div>
+                <div className={'note ' + (ok ? '' : 'warn')}>
+                  {ok ? 'Correcto' : 'No es correcto'}: es <b>{a.name}</b> (asincronía de {a.phase}).
+                </div>
                 <StepResolver sim={sim} a={a} lab={lab} onStep={() => nextStep(a)} onAll={() => resolveAll(a)} />
                 <Detail a={a} revealName={false} />
                 <div className="row">
@@ -206,7 +210,9 @@ export function AsyncPanel({ sim, settings, patient, level, apply, events, onFoc
             return (
               <div key={a.id} className={'item' + (active ? ' sel' : '')}>
                 <div className="row" style={{ justifyContent: 'space-between' }}>
-                  <span className="ttl">{hideNames ? `Patrón ${ASYNCHRONIES.indexOf(a) + 1}` : a.name}</span>
+                  <span className="ttl">
+                    {a.name} <span className="muted small">· asincronía de {a.phase}</span>
+                  </span>
                   <span className="row">
                     <button onClick={() => activate(a)}>{active ? 'Reiniciar' : 'Activar asincronía'}</button>
                   </span>
