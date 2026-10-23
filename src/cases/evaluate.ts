@@ -133,6 +133,14 @@ const SETTING_LABELS: [keyof VentSettings, string, (v: unknown) => string][] = [
   ['tLow', 'Tlow', (v) => String(v)],
 ];
 
+/** Cambios de programación entre dos estados (rótulo, valor previo y nuevo). */
+export function settingsDiff(a: VentSettings, b: VentSettings): { label: string; from: string; to: string }[] {
+  const out: { label: string; from: string; to: string }[] = [];
+  for (const [k, label, f] of SETTING_LABELS) if (a[k] !== b[k]) out.push({ label, from: f(a[k]), to: f(b[k]) });
+  if (a.leakComp !== b.leakComp) out.push({ label: 'Compensación de fugas', from: a.leakComp ? 'sí' : 'no', to: b.leakComp ? 'sí' : 'no' });
+  return out;
+}
+
 const fmt = (v: number | null, d = 1) => (v === null || !Number.isFinite(v) ? '—' : v.toFixed(d));
 
 export function genericRisks(m: Metrics, s: VentSettings, pbw: number): string[] {
@@ -166,12 +174,7 @@ export function buildReport(
 ): Report {
   const rules = c.rules.map((r) => evalRule(r, final.metrics, final.settings.mode));
   const process = c.process.map((p) => ({ rule: p, done: (flags[p.flag] ?? -1) >= caseStart }));
-  const settingsChanges: Report['settingsChanges'] = [];
-  for (const [k, label, f] of SETTING_LABELS) {
-    const a = initial.settings[k];
-    const b = final.settings[k];
-    if (a !== b) settingsChanges.push({ label, from: f(a), to: f(b) });
-  }
+  const settingsChanges = settingsDiff(initial.settings, final.settings);
   const pairs: [MetricKey, string, number, string][] = [
     ['vtPerKg', 'Vt real', 1, 'mL/kg'],
     ['pplat', 'Pplat', 1, 'cmH₂O'],

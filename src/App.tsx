@@ -255,7 +255,7 @@ export default function App() {
   for (const e of sim.asyncEvents) if (e.t > sim.t - 60) events[e.type] = (events[e.type] ?? 0) + 1;
   const ineff = sim.drive.efforts.filter((e) => e.onset > sim.t - 60 && e.onset < sim.t - e.ti - 0.3 && !e.triggered && !e.reverse).length;
   if (sim.modeAllowsTrigger && ineff) events.ineffective = ineff;
-  const notes = useMemo(() => (explain && level < 3 ? interpret(m, settings, g, sim.pbw) : []), [explain, level, m, settings, g, sim.pbw]);
+  const notes = useMemo(() => (explain && level < 3 && !asyncFocusHidden ? interpret(m, settings, g, sim.pbw) : []), [explain, level, m, settings, g, sim.pbw, asyncFocusHidden]);
 
   const pushUndo = () => setUndoStack((u) => [...u.slice(-9), { settings: { ...ctl.sim.settings, alarms: { ...ctl.sim.settings.alarms } }, patient: { ...ctl.sim.patient, effort: { ...ctl.sim.patient.effort } } }]);
   const assist: AssistActions = {
@@ -293,7 +293,8 @@ export default function App() {
     <div className="device">
       <header className="statusbar">
         <div className="sb-left">
-          <span className="sb-brand">Ventilab</span>
+          <span className="sb-brand" title={`Versión ${__BUILD__} UTC`}>Ventilab</span>
+          <span className="sb-ver">v{__BUILD__.slice(5, 10).replace('-', '.')} {__BUILD__.slice(11)}</span>
           <span className="sb-mode">{modeShort}</span>
           {(() => {
             const last = [...sim.markers].reverse().find((x) => x.type === 'inspStart');
@@ -404,7 +405,7 @@ export default function App() {
           )}
         </section>
         <div className="midrow">
-        {level === 1 && <AsyncBanner ctl={ctl} actions={assist} onOpen={() => setTab('resolver')} />}
+        {level === 1 && !asyncFocusHidden && <AsyncBanner ctl={ctl} actions={assist} onOpen={() => setTab('resolver')} />}
         {notes.length > 0 && (
           <button className="insight" onClick={() => setTab('lectura')} title="Ver toda la lectura fisiológica">
             <span className="insight-tag">Lectura</span>
