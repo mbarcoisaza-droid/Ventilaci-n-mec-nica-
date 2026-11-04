@@ -1,7 +1,7 @@
 // Service worker de Ventilab: permite usar la aplicación instalada sin conexión.
 // Estrategia: precarga del shell; red primero para la página (para recibir actualizaciones)
 // y caché primero para recursos con hash y fuentes.
-const CACHE = 'ventilab-v1';
+const CACHE = 'ventilab-v2';
 const SHELL = ['./', './index.html', './manifest.webmanifest', './icons/icon-192.png', './icons/icon-512.png'];
 
 self.addEventListener('install', (e) => {
@@ -12,7 +12,7 @@ self.addEventListener('activate', (e) => {
   e.waitUntil(
     caches
       .keys()
-      .then((keys) => Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k))))
+      .then((keys) => Promise.all(keys.filter((k) => k.startsWith('ventilab') && k !== CACHE).map((k) => caches.delete(k))))
       .then(() => self.clients.claim()),
   );
 });
@@ -24,6 +24,8 @@ self.addEventListener('fetch', (e) => {
   const sameOrigin = url.origin === self.location.origin;
   const isFont = url.hostname === 'fonts.googleapis.com' || url.hostname === 'fonts.gstatic.com';
   if (!sameOrigin && !isFont) return;
+  // el Plan Kaplan (/kaplan/) tiene su propio service worker
+  if (sameOrigin && url.pathname.includes('/kaplan/')) return;
 
   if (req.mode === 'navigate') {
     e.respondWith(
