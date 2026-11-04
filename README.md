@@ -24,6 +24,19 @@ El módulo «Paciente real» recibe la programación del ventilador, la mecánic
 
 Las 12 asincronías reproducen la morfología descrita por Varón-Vega et al. (*Acta Colomb Cuid Intensivo* 2024, figs. 6–8): esfuerzos inefectivos con «joroba» del flujo espiratorio, doble disparo con volumen apilado, espiga de presión en el ciclado tardío, muesca espiratoria en el ciclado prematuro, Paw cóncava en el flujo insuficiente, etc. Al activarla, la asincronía aparece en todos los ciclos; el indicador **Asincronía (% de ciclos)** del panel de valores (ciclos con asincronía en los últimos 30 s; > 10 % = grave) baja a medida que se aplican, uno a uno, los pasos de corrección propuestos en esa revisión.
 
+## Plan Kaplan (app de estudio)
+
+En `kaplan/` hay una segunda aplicación, independiente del simulador: **Plan Kaplan**, para organizar y verificar las 3.000 preguntas de Kaplan antes del examen de residencia (21-feb-2027). Se publica en `…/ventilaci-n-mec-nica-/kaplan/` y se instala como app (PWA) igual que Ventilab.
+
+- Plan del 3-nov-2026 al 14-feb-2027 (preguntas nuevas) y repaso del 15 al 20 de febrero; referencia de 205 preguntas/semana.
+- Noviembre precargado (turnos de 12 h, 6 h, fines de semana y días libres; meta 815). Los días «sin definir» reciben una cuota automática que reparte lo que falta para llegar a 3.000.
+- Vistas Día / Semana / Mes, checklist diario, «Completar día» verificado con el número real de preguntas nuevas (los repasos se cuentan aparte), reprogramación de déficits.
+- Rutinas editables con traslados, meta de sueño y aviso de superposiciones.
+- Alarmas mientras la app está abierta (posponer, descartar, reprogramar) y exportación `.ics` al calendario del teléfono para avisos con la app cerrada.
+- Lista de repaso de incorrectas y dudosas con filtros; datos locales con exportación/restauración JSON y CSV.
+
+Código: `kaplan/src/` (lógica en `plan.ts`, `alarms.ts`, `io.ts`; pruebas en `plan.test.ts`). Recursos estáticos en `public/kaplan/`.
+
 ## Uso para desarrollo
 
 ```bash
