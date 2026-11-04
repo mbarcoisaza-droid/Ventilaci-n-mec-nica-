@@ -9,6 +9,7 @@
     "build": "tsc --noEmit && vite build",
     "build:single": "tsc --noEmit && vite build --mode single",
     "build:kaplan": "tsc --noEmit && vite build --mode kaplan-single",
+    "build:coach": "tsc --noEmit && vite build --mode coach-single",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },

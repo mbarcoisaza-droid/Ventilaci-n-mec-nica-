@@ -14,5 +14,5 @@
     "noEmit": true,
     "types": ["vitest/globals"]
   },
-  "include": ["src", "kaplan/src", "vite.config.ts"]
+  "include": ["src", "kaplan/src", "coach/src", "vite.config.ts"]
 }

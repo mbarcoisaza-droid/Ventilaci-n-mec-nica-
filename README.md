@@ -37,6 +37,21 @@ En `kaplan/` hay una segunda aplicación, independiente del simulador: **Plan Ka
 
 Código: `kaplan/src/` (lógica en `plan.ts`, `alarms.ts`, `io.ts`; pruebas en `plan.test.ts`). Recursos estáticos en `public/kaplan/`.
 
+## Mi Coach (app de entrenamiento personal)
+
+En `coach/` hay una tercera aplicación independiente: **Mi Coach**, para planear rutinas, seguir cada ejercicio durante la sesión y revisar el cumplimiento. Se publica en `…/ventilaci-n-mec-nica-/coach/` y se instala como app (PWA). `npm run build:coach` genera un único HTML en `dist-coach/` (copiado como `Mi-Coach.html`).
+
+- **Inicio:** calendario semanal, rutina del día con «Iniciar entrenamiento», días completados, pendientes, racha y meta semanal. Las sesiones pasadas quedan *pendientes* (no se marcan como incumplidas) y se pueden reprogramar; la fecha original queda registrada.
+- **Rutinas por bloques** (calentamiento, fuerza, circuito, cardio, enfriamiento): ejercicios y orden, tiempo o repeticiones, rondas, descansos entre ejercicios y entre rondas, parámetros (velocidad con unidad configurable, inclinación, peso…) marcables como «por definir», variantes más fácil / más difícil / bajo impacto, notas y comentarios del entrenador.
+- **Importar texto:** convierte instrucciones pegadas en una rutina estructurada. Los ejercicios no reconocidos, los nombres ambiguos y los valores no numéricos (p. ej. inclinación «máxima») se marcan para confirmar; no se inventan movimientos ni parámetros. Antes de empezar, una revisión permite editarlos o confirmarlos.
+- **Guía visual:** video de YouTube incrustado (URL o ID; reproductor `youtube-nocookie`, sin reproducción automática, controles de reproducir/pausar, repetir y subtítulos; iframe aislado para no abrir YouTube). Si no hay video, el enlace no es válido, el video no se puede incrustar, no responde o no hay conexión, se muestra una ilustración animada (muñeco vectorial con flechas y secuencia inicio → movimiento → final, ampliable) con instrucciones numeradas, puntos clave y errores frecuentes. No hay videos precargados: los añade el entrenador.
+- **Modo entrenamiento:** un ejercicio a la vez, temporizador circular, ±10 s, avisos sonoros y vibración opcionales, descansos automáticos con «Sigue: …», botones Empezar / Pausar / Terminar ejercicio / Saltar / Volver, pantalla encendida, detener y registrar dolor o malestar, y resumen con duración real, ejercicios hechos y cómo se sintió la persona. Se puede salir y continuar después.
+- **Recordatorios:** plan semanal (días, hora, rutina), aviso para entrenar y para registrar; se pide permiso antes de activar notificaciones. Como app web solo avisa con la app abierta; para avisos con la app cerrada exporta las sesiones a `.ics` (calendario del teléfono, aviso 10 min antes).
+- **Perfil:** nivel, equipo, objetivo y restricciones; la rutina nunca se modifica automáticamente, solo se muestran opciones para revisar con el entrenador. Sin diagnósticos ni promesas de resultados.
+- Modo claro / oscuro / sistema. Datos en el dispositivo (localStorage) con exportación y restauración JSON.
+
+Código: `coach/src/` (modelo en `model.ts`, importador en `importer.ts`, secuencia del entrenamiento en `sequence.ts`, ilustraciones en `poses.ts`, pruebas en `coach.test.ts`). Recursos estáticos en `public/coach/`.
+
 ## Uso para desarrollo
 
 ```bash
@@ -45,6 +60,7 @@ npm run dev          # servidor de desarrollo
 npm test             # pruebas de consistencia del motor y de los casos (vitest)
 npm run build        # compilación estándar en dist/
 npm run build:single # archivo HTML único en dist-single/
+npm run build:coach  # Mi Coach en un único HTML (dist-coach/)
 ```
 
 ## Estructura
