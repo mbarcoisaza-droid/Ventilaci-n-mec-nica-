@@ -1,9 +1,8 @@
 /** Modo entrenamiento: un ejercicio a la vez con temporizador, descansos y resumen final. */
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { finishWorkout, discardWorkout } from '../actions';
 import { ExerciseInfo, ExerciseMedia } from '../components/ExerciseMedia';
 import { CardEditor } from '../components/CardEditor';
-import { Thumb } from '../components/Illustration';
 import { Sheet } from '../components/ui';
 import { fmtClock, fmtDur, todayISO } from '../dates';
 import { AppState, BLOCK_ICON, Discomfort, ExerciseLog, HistoryEntry, uid } from '../model';
@@ -12,6 +11,12 @@ import { tone, unlockAudio, vibrate } from '../notify';
 import { Step, amountText, buildSteps, displayName, estimateSeconds, paramText, repsNumber, stepSeconds } from '../sequence';
 
 type Status = 'listo' | 'corriendo' | 'pausado';
+
+/** La demostración y las instrucciones no se redibujan con cada tic del temporizador. */
+const MemoMedia = memo(function MemoMedia({ ex }: { ex: Step['exercise'] }) {
+  return <ExerciseMedia ex={ex} compact />;
+});
+const MemoInfo = memo(ExerciseInfo);
 
 interface Props {
   state: AppState;
@@ -49,14 +54,28 @@ export function Workout({ state, update, onClose }: Props) {
   const [stopSheet, setStopSheet] = useState(false);
   const [showInfo, setShowInfo] = useState(false);
   const [card, setCard] = useState(false);
+  const openCard = useCallback(() => setCard(true), []);
   const [endedAt, setEndedAt] = useState<string | null>(null);
 
   const endAt = useRef(0);
   const lastBeep = useRef(-1);
+  const sideSwitched = useRef(false);
+  const [sideTwo, setSideTwo] = useState(false);
   const startedRun = useRef(0);
 
   const step: Step | undefined = steps[index];
   const timed = step ? step.seconds != null || step.kind === 'descanso' : false;
+
+  // al abrir la ficha durante la sesión, se pausa el temporizador
+  useEffect(() => {
+    if (card && status === 'corriendo') pause();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [card]);
+
+  // al cambiar de paso, volver arriba para ver la demostración y el temporizador
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.scrollY > 40) window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, [index]);
 
   // persistir el avance para poder continuar si se cierra la app
   useEffect(() => {
@@ -83,6 +102,8 @@ export function Workout({ state, update, onClose }: Props) {
       setIndex(i);
       setElapsed(0);
       lastBeep.current = -1;
+      sideSwitched.current = false;
+      setSideTwo(false);
       if (!st) {
         setStatus('listo');
         setEndedAt(new Date().toISOString());
@@ -130,6 +151,12 @@ export function Workout({ state, update, onClose }: Props) {
         const left = endAt.current - Date.now();
         setRemaining(Math.max(0, left));
         const sec = Math.ceil(left / 1000);
+        if (step.sideSeconds && !sideSwitched.current && left <= step.sideSeconds * 1000) {
+          sideSwitched.current = true;
+          setSideTwo(true);
+          if (sound) tone(990, 300);
+          if (vib) vibrate([150, 80, 150]);
+        }
         if (sec <= 3 && sec >= 1 && sec !== lastBeep.current) {
           lastBeep.current = sec;
           if (sound) tone(660, 120);
@@ -144,7 +171,7 @@ export function Workout({ state, update, onClose }: Props) {
       }
     }, 200);
     return () => clearInterval(iv);
-  }, [status, phase, step, timed, index, advance, sound]);
+  }, [status, phase, step, timed, index, advance, sound, vib]);
 
   const start = () => {
     unlockAudio();
@@ -171,15 +198,15 @@ export function Workout({ state, update, onClose }: Props) {
   };
   const skip = () => {
     if (!step) return;
+    const running = status === 'corriendo';
     if (step.kind === 'trabajo') {
       markWork(index, 'saltado', 0);
       // salta también el descanso que sigue
       let j = index + 1;
-      while (steps[j] && steps[j].kind === 'descanso') j++;
-      loadStep(j, false);
+      while (steps[j] && steps[j].kind === 'descanso' && steps[j].restKind !== 'bloque') j++;
+      loadStep(j, running);
     } else {
-      const next = steps[index + 1];
-      loadStep(index + 1, !!next && autoAdvance);
+      loadStep(index + 1, running || autoAdvance);
     }
   };
   const back = () => {
@@ -191,7 +218,7 @@ export function Workout({ state, update, onClose }: Props) {
       delete y[j];
       return y;
     });
-    loadStep(j, false);
+    loadStep(j, status === 'corriendo');
   };
 
   const stopNow = (d: Discomfort | null) => {
@@ -241,6 +268,10 @@ export function Workout({ state, update, onClose }: Props) {
   const blockChanged = !isRest && status === 'listo' && (index === 0 || steps[index - 1]?.blockIdx !== step.blockIdx);
   const nextBlockWork = step.restKind === 'bloque' ? steps.slice(index + 1).find((s) => s.kind === 'trabajo') : undefined;
 
+  const workName = (st: Step) => displayName(st.exercise, lowImpact);
+  const soon = !isRest && timed && status === 'corriendo' && remaining <= 5000 && !!steps[index + 1];
+  const upcoming = steps[index + 1];
+
   return (
     <div className={`workout ${isRest ? 'resting' : ''}`}>
       <header className="wo-head">
@@ -263,125 +294,116 @@ export function Workout({ state, update, onClose }: Props) {
 
       <main className="wo-main">
         {blockChanged && <p className="notice">{index === 0 ? `Primer bloque: ${step.block.title}.` : `Nuevo bloque: ${step.block.title}.`} Pulsa «Empezar» cuando estés listo.</p>}
-        {isRest ? (
-          <div className="rest-card">
-            <p className="eyebrow">{step.restKind === 'bloque' ? `Prepárate · siguiente bloque: ${nextBlockWork?.block.title ?? ''}` : step.restKind === 'rondas' ? 'Descanso entre rondas' : 'Descanso'}</p>
-            {nextWork && (
-              <div className="next-up">
-                <div className="next-thumb">
-                  <Thumb pose={nextWork.exercise.pose} />
-                </div>
-                <div>
-                  <span className="muted">Sigue</span>
-                  <b>{displayName(nextWork.exercise, lowImpact)}</b>
-                  <span className="muted">
-                    {amountText(nextWork.exercise)}
-                    {nextWork.timeSource === 'reps' && nextWork.seconds ? ` · ≈ ${fmtDur(nextWork.seconds)}` : ''}
-                    {nextWork.round !== step.round ? ` · Ronda ${nextWork.round}` : ''}
-                  </span>
-                </div>
-              </div>
-            )}
-          </div>
-        ) : (
-          <>
-            <h1 className="wo-name">{name}</h1>
-            <p className="wo-amount">
-              {step.timeSource === 'defecto' ? `${amountText(ex)} · ${fmtDur(step.seconds ?? 0)} por defecto` : amountText(ex)}
-              {step.timeSource === 'reps' && step.seconds ? <span> · ≈ {fmtDur(step.seconds)}</span> : null}
-            </p>
-            {spanishName(ex) && name === ex.name && <p className="center muted es-sub">{spanishName(ex)}</p>}
-            {lowImpact && ex.lowImpact && <p className="tiny muted center">Variante de bajo impacto · original: {ex.name}</p>}
-            {ex.params.length > 0 && (
-              <div className="wo-params">
-                {ex.params.map((p) => (
-                  <span key={p.id} className={`chip ${p.pending ? 'warn' : ''}`}>
-                    {p.label}: <b>{paramText(p) || '—'}</b>
-                    {p.pending ? ' (por definir)' : ''}
-                  </span>
-                ))}
-              </div>
-            )}
-          </>
-        )}
 
-        <div className="timer" aria-live="polite">
-          <svg viewBox="0 0 200 200">
-            <circle cx="100" cy="100" r={R} className="track" />
-            {timed && <circle cx="100" cy="100" r={R} className="prog" strokeDasharray={C} strokeDashoffset={C * (1 - pct)} transform="rotate(-90 100 100)" />}
-          </svg>
-          <div className="timer-txt">
-            {step.reps != null && !isRest ? (
-              <>
-                <b>{repsNumber(ex)}</b>
-                <span>
-                  {ex.repUnit || 'repeticiones'}
-                  {ex.perSide ? ` ${ex.perSide}` : ''}
-                </span>
-                <small>
-                  {fmtClock(shown / 1000)}
-                  {step.timeSource === 'reps' ? ' · tiempo estimado' : ''}
-                </small>
-              </>
-            ) : (
-              <>
-                <b>{fmtClock(shown / 1000)}</b>
-                <span>
-                  {isRest
-                    ? step.restKind === 'bloque'
-                      ? 'prepárate'
-                      : 'descanso'
-                    : step.timeSource === 'defecto'
-                      ? 'sin cantidad indicada'
-                      : status === 'listo'
-                        ? 'listo'
-                        : status === 'pausado'
-                          ? 'en pausa'
-                          : 'en curso'}
-                </span>
-                {!isRest && ex.perSide && <small>{ex.perSide}</small>}
-              </>
-            )}
-          </div>
-        </div>
-        {timed && (
-          <div className="adjust">
+        {/* Escenario: la demostración siempre arriba; en el descanso se ve la del siguiente ejercicio */}
+        <section className="wo-stage">
+          {isRest ? (
+            <>
+              <p className="eyebrow">
+                {step.restKind === 'bloque' ? `Prepárate · siguiente bloque: ${nextBlockWork?.block.title ?? ''}` : step.restKind === 'rondas' ? 'Descanso entre rondas' : 'Descanso'}
+              </p>
+              {nextWork && (
+                <>
+                  <p className="next-label">
+                    Sigue: <b>{workName(nextWork)}</b>
+                  </p>
+                  <p className="wo-amount small">
+                    {amountText(nextWork.exercise)}
+                    {nextWork.round !== step.round ? ` · ${nextWork.block.kind === 'fuerza' ? 'Serie' : 'Ronda'} ${nextWork.round}` : ''}
+                  </p>
+                  <MemoMedia ex={nextWork.exercise} />
+                </>
+              )}
+            </>
+          ) : (
+            <>
+              <MemoMedia ex={ex} />
+              {sideTwo && <p className="side-switch">↔ Cambia de lado</p>}
+              <h1 className="wo-name">{name}</h1>
+              <p className="wo-amount">
+                {step.timeSource === 'defecto' ? `${amountText(ex)} · ${fmtDur(step.seconds ?? 0)} por defecto` : amountText(ex)}
+                {step.timeSource === 'reps' && step.seconds ? <span> · ≈ {fmtDur(step.seconds)}</span> : null}
+                {step.sideSeconds ? <span> · {fmtDur(step.seconds ?? 0)} en total</span> : null}
+              </p>
+              {spanishName(ex) && name === ex.name && <p className="center muted es-sub">{spanishName(ex)}</p>}
+              {lowImpact && ex.lowImpact && <p className="tiny muted center">Variante de bajo impacto · original: {ex.name}</p>}
+              {ex.params.length > 0 && (
+                <div className="wo-params">
+                  {ex.params.map((p) => (
+                    <span key={p.id} className={`chip ${p.pending ? 'warn' : ''}`}>
+                      {p.label}: <b>{paramText(p) || '—'}</b>
+                      {p.pending ? ' (por definir)' : ''}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </>
+          )}
+        </section>
+
+        <div className="timer-row">
+          {timed ? (
             <button className="btn ghost sm" onClick={() => adjust(-10)} aria-label="Restar 10 segundos">
               −10 s
             </button>
+          ) : (
+            <span />
+          )}
+          <div className="timer" aria-live="polite">
+            <svg viewBox="0 0 200 200">
+              <circle cx="100" cy="100" r={R} className="track" />
+              {timed && <circle cx="100" cy="100" r={R} className="prog" strokeDasharray={C} strokeDashoffset={C * (1 - pct)} transform="rotate(-90 100 100)" />}
+            </svg>
+            <div className="timer-txt">
+              {step.reps != null && !isRest ? (
+                <>
+                  <b>{repsNumber(ex)}</b>
+                  <span>
+                    {ex.repUnit || 'repeticiones'}
+                    {ex.perSide ? ` ${ex.perSide}` : ''}
+                  </span>
+                  <small>{fmtClock(shown / 1000)}</small>
+                </>
+              ) : (
+                <>
+                  <b>{fmtClock(shown / 1000)}</b>
+                  <span>
+                    {isRest
+                      ? step.restKind === 'bloque'
+                        ? 'prepárate'
+                        : 'descanso'
+                      : step.timeSource === 'defecto'
+                        ? 'sin cantidad'
+                        : status === 'listo'
+                          ? 'listo'
+                          : status === 'pausado'
+                            ? 'en pausa'
+                            : 'en curso'}
+                  </span>
+                  {!isRest && ex.perSide && <small>{step.sideSeconds ? (sideTwo ? '2.º lado' : '1.er lado') : ex.perSide}</small>}
+                </>
+              )}
+            </div>
+          </div>
+          {timed ? (
             <button className="btn ghost sm" onClick={() => adjust(10)} aria-label="Sumar 10 segundos">
               +10 s
             </button>
-          </div>
-        )}
-
-        <div className="wo-ctrls">
-          {status === 'corriendo' ? (
-            <button className="btn big" onClick={pause}>
-              ⏸ Pausar
-            </button>
           ) : (
-            <button className="btn big primary" onClick={start}>
-              ▶ {status === 'pausado' ? 'Reanudar' : 'Empezar'}
-            </button>
+            <span />
           )}
-          <button className="btn big ok" onClick={finishExercise}>
-            ✓ {isRest ? 'Terminar descanso' : 'Terminar ejercicio'}
-          </button>
-          <div className="row2">
-            <button className="btn" onClick={back} disabled={index === 0}>
-              ← Volver
-            </button>
-            <button className="btn" onClick={skip}>
-              Saltar →
-            </button>
-          </div>
         </div>
+
+        {!isRest && upcoming && (
+          <p className={`up-next ${soon ? 'soon' : ''}`}>
+            {soon ? '⏭ En 5 s: ' : 'Después: '}
+            {upcoming.kind === 'descanso' ? (upcoming.restKind === 'bloque' ? 'prepárate para el siguiente bloque' : `descanso ${fmtDur(upcoming.seconds ?? 0)}`) : workName(upcoming)}
+          </p>
+        )}
 
         {!isRest && (
           <section className="wo-guide">
-            <ExerciseMedia ex={ex} compact />
-            <ExerciseInfo ex={ex} lowImpact={lowImpact} compact={!showInfo} onEditCard={() => (status === 'corriendo' && pause(), setCard(true))} />
+            <MemoInfo ex={ex} lowImpact={lowImpact} compact={!showInfo} onEditCard={openCard} />
             {ex.steps.length > 0 && (
               <button className="btn ghost wide" onClick={() => setShowInfo((v) => !v)} aria-expanded={showInfo}>
                 {showInfo ? 'Menos detalles' : 'Respiración, claves, errores y variantes'}
@@ -389,15 +411,34 @@ export function Workout({ state, update, onClose }: Props) {
             )}
           </section>
         )}
-        {!isRest && nextWork && (
-          <p className="tiny muted center">
-            Después: {displayName(nextWork.exercise, lowImpact)}
-          </p>
-        )}
         <button className="btn ghost danger wide" onClick={() => (status === 'corriendo' && pause(), setStopSheet(true))}>
           Detener y registrar malestar
         </button>
       </main>
+
+      {/* Controles fijos abajo: siempre al alcance sin desplazarse */}
+      <nav className="wo-bar" aria-label="Controles del entrenamiento">
+        {status === 'corriendo' ? (
+          <button className="btn big" onClick={pause}>
+            ⏸ Pausar
+          </button>
+        ) : (
+          <button className="btn big primary" onClick={start}>
+            ▶ {status === 'pausado' ? 'Reanudar' : 'Empezar'}
+          </button>
+        )}
+        <div className="wo-bar-row">
+          <button className="btn" onClick={back} disabled={index === 0} aria-label="Volver">
+            ← Volver
+          </button>
+          <button className="btn ok" onClick={finishExercise}>
+            ✓ {isRest ? 'Terminar descanso' : 'Terminar ejercicio'}
+          </button>
+          <button className="btn" onClick={skip} aria-label="Saltar">
+            Saltar →
+          </button>
+        </div>
+      </nav>
 
       {card && step && <CardEditor state={state} update={update} ex={step.exercise} onClose={() => setCard(false)} />}
       {stopSheet && (

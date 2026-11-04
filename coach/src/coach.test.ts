@@ -375,6 +375,10 @@ describe('Entrenamiento corrido', () => {
     expect(transitions.length).toBe(espalda.blocks.length - 1);
     // las repeticiones configuradas no cambian
     expect(espalda.blocks[2].exercises[0]).toMatchObject({ reps: 12, repsMax: 15 });
+    // 30 s por pierna: 30 s de cada lado (60 s en total) con aviso a la mitad
+    const cuad = trainerRoutines().find((r) => r.name === 'Cuadriceps')!;
+    const flexor = buildSteps(cuad, flow).find((st) => st.exercise.libKey === 'flexor-cadera');
+    expect(flexor).toMatchObject({ seconds: 60, sideSeconds: 30 });
     // sin modo corrido, los ejercicios por repeticiones no tienen tiempo
     expect(buildSteps(espalda).find((s) => s.reps === 12)!.seconds).toBeNull();
   });

@@ -15,6 +15,8 @@ export interface Step {
   restKind?: 'ejercicios' | 'rondas' | 'bloque';
   /** De dónde sale el tiempo de un ejercicio en modo corrido. */
   timeSource?: 'tiempo' | 'reps' | 'defecto';
+  /** Ejercicio por tiempo y por lado: segundos de cada lado (a la mitad se avisa «Cambia de lado»). */
+  sideSeconds?: number;
 }
 
 /** Opciones del modo entrenamiento corrido (sin detenerse entre ejercicios ni bloques). */
@@ -68,7 +70,12 @@ export function buildSteps(r: Routine, flow?: FlowOptions): Step[] {
           seconds = rs > 0 ? rs : flow.defaultWork;
           timeSource = rs > 0 ? 'reps' : 'defecto';
         }
-        out.push({ ...base, kind: 'trabajo', seconds, reps, timeSource });
+        let sideSeconds: number | undefined;
+        if (flow?.continuous && ex.mode === 'tiempo' && ex.perSide && seconds) {
+          sideSeconds = seconds;
+          seconds = seconds * 2;
+        }
+        out.push({ ...base, kind: 'trabajo', seconds, reps, timeSource, sideSeconds });
         const lastEx = exIdx === block.exercises.length - 1;
         if (!lastEx) {
           const rest = ex.restAfter ?? block.restBetweenExercises;
