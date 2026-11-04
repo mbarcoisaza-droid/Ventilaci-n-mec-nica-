@@ -157,7 +157,25 @@ export function Settings({ state, update, replace }: { state: AppState; update: 
         <h2>Durante el entrenamiento</h2>
         <Toggle checked={st.sound} onChange={(v) => setS({ sound: v })} label="Avisos sonoros" hint="Cuenta regresiva de 3 segundos y cambio de ejercicio." />
         <Toggle checked={st.vibrate} onChange={(v) => setS({ vibrate: v })} label="Vibración" hint="Si el dispositivo lo permite." />
-        <Toggle checked={st.autoAdvance} onChange={(v) => setS({ autoAdvance: v })} label="Avanzar automáticamente" hint="Tras el descanso empieza el siguiente ejercicio del mismo bloque." />
+        <Toggle
+          checked={st.autoAdvance}
+          onChange={(v) => setS({ autoAdvance: v })}
+          label="Entrenamiento corrido"
+          hint="Pulsas «Empezar» una vez y la sesión avanza sola: ejercicios, descansos y bloques. Los ejercicios por repeticiones usan un tiempo calculado."
+        />
+        {st.autoAdvance && (
+          <div className="grid2">
+            <Field label="Segundos por repetición" hint="Por lado se duplica. Ej.: 12–15 reps × 3 s = 45 s.">
+              <Stepper label="Segundos por repetición" value={st.secPerRep ?? 3} min={1} max={15} onChange={(n) => setS({ secPerRep: n })} suffix="s" />
+            </Field>
+            <Field label="«Prepárate» entre bloques">
+              <Stepper label="Transición entre bloques" value={st.blockTransition ?? 10} min={0} max={120} step={5} onChange={(n) => setS({ blockTransition: n })} suffix="s" />
+            </Field>
+            <Field label="Si no hay repeticiones ni tiempo">
+              <Stepper label="Tiempo por defecto" value={st.defaultWork ?? 30} min={5} max={300} step={5} onChange={(n) => setS({ defaultWork: n })} suffix="s" />
+            </Field>
+          </div>
+        )}
       </section>
 
       <section className="card">

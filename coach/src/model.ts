@@ -190,7 +190,14 @@ export interface Settings {
   theme: 'sistema' | 'claro' | 'oscuro';
   sound: boolean;
   vibrate: boolean;
+  /** Entrenamiento corrido: avanza solo entre ejercicios, descansos y bloques. */
   autoAdvance: boolean;
+  /** Segundos por repetición (tiempo de los ejercicios por repeticiones). */
+  secPerRep: number;
+  /** Cuenta «Prepárate» entre bloques (s). */
+  blockTransition: number;
+  /** Tiempo para ejercicios sin cantidad indicada (s). */
+  defaultWork: number;
   weeklyGoal: number;
 }
 
@@ -463,7 +470,7 @@ export function defaultState(): AppState {
       generated: [],
       fired: [],
     },
-    settings: { theme: 'sistema', sound: true, vibrate: true, autoAdvance: true, weeklyGoal: 3 },
+    settings: { theme: 'sistema', sound: true, vibrate: true, autoAdvance: true, secPerRep: 3, blockTransition: 10, defaultWork: 30, weeklyGoal: 3 },
     active: null,
     onboarded: false,
     seeds: [],

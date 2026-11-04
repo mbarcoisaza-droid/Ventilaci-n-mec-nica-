@@ -30,9 +30,12 @@ const FEELINGS = [
 export function Workout({ state, update, onClose }: Props) {
   const active = state.active!;
   const routine = active.snapshot;
-  const steps = useMemo(() => buildSteps(routine), [routine]);
+  const { sound, vibrate: vib, autoAdvance, secPerRep, blockTransition, defaultWork } = state.settings;
+  const steps = useMemo(
+    () => buildSteps(routine, { continuous: autoAdvance, secPerRep: secPerRep || 3, transition: blockTransition ?? 10, defaultWork: defaultWork || 30 }),
+    [routine, autoAdvance, secPerRep, blockTransition, defaultWork],
+  );
   const lowImpact = active.lowImpact;
-  const { sound, vibrate: vib, autoAdvance } = state.settings;
 
   const [index, setIndex] = useState(Math.min(active.index, steps.length));
   const [results, setResults] = useState(active.results);
@@ -105,7 +108,8 @@ export function Workout({ state, update, onClose }: Props) {
       const next = steps[from + 1];
       if (!next) return loadStep(from + 1, false);
       const sameBlock = cur && next.blockIdx === cur.blockIdx;
-      const auto = next.kind === 'descanso' || (sameBlock && autoAdvance && (next.seconds != null || next.kind !== 'trabajo'));
+      // corrido: todo avanza solo; si no, solo descansos y ejercicios con tiempo del mismo bloque
+      const auto = autoAdvance || next.kind === 'descanso' || (sameBlock && next.seconds != null);
       if (sound) tone(next.kind === 'descanso' ? 520 : 880, 260);
       if (vib) vibrate([200]);
       loadStep(from + 1, auto);
@@ -175,7 +179,7 @@ export function Workout({ state, update, onClose }: Props) {
       loadStep(j, false);
     } else {
       const next = steps[index + 1];
-      loadStep(index + 1, !!next && autoAdvance && next.blockIdx === step.blockIdx && next.seconds != null);
+      loadStep(index + 1, !!next && autoAdvance);
     }
   };
   const back = () => {
@@ -235,6 +239,7 @@ export function Workout({ state, update, onClose }: Props) {
   const C = 2 * Math.PI * R;
   const isRest = step.kind === 'descanso';
   const blockChanged = !isRest && status === 'listo' && (index === 0 || steps[index - 1]?.blockIdx !== step.blockIdx);
+  const nextBlockWork = step.restKind === 'bloque' ? steps.slice(index + 1).find((s) => s.kind === 'trabajo') : undefined;
 
   return (
     <div className={`workout ${isRest ? 'resting' : ''}`}>
@@ -257,10 +262,10 @@ export function Workout({ state, update, onClose }: Props) {
       </div>
 
       <main className="wo-main">
-        {blockChanged && <p className="notice">Nuevo bloque: {step.block.title}. Pulsa «Empezar» cuando estés listo.</p>}
+        {blockChanged && <p className="notice">{index === 0 ? `Primer bloque: ${step.block.title}.` : `Nuevo bloque: ${step.block.title}.`} Pulsa «Empezar» cuando estés listo.</p>}
         {isRest ? (
           <div className="rest-card">
-            <p className="eyebrow">{step.restKind === 'rondas' ? 'Descanso entre rondas' : 'Descanso'}</p>
+            <p className="eyebrow">{step.restKind === 'bloque' ? `Prepárate · siguiente bloque: ${nextBlockWork?.block.title ?? ''}` : step.restKind === 'rondas' ? 'Descanso entre rondas' : 'Descanso'}</p>
             {nextWork && (
               <div className="next-up">
                 <div className="next-thumb">
@@ -271,6 +276,7 @@ export function Workout({ state, update, onClose }: Props) {
                   <b>{displayName(nextWork.exercise, lowImpact)}</b>
                   <span className="muted">
                     {amountText(nextWork.exercise)}
+                    {nextWork.timeSource === 'reps' && nextWork.seconds ? ` · ≈ ${fmtDur(nextWork.seconds)}` : ''}
                     {nextWork.round !== step.round ? ` · Ronda ${nextWork.round}` : ''}
                   </span>
                 </div>
@@ -280,6 +286,10 @@ export function Workout({ state, update, onClose }: Props) {
         ) : (
           <>
             <h1 className="wo-name">{name}</h1>
+            <p className="wo-amount">
+              {step.timeSource === 'defecto' ? `${amountText(ex)} · ${fmtDur(step.seconds ?? 0)} por defecto` : amountText(ex)}
+              {step.timeSource === 'reps' && step.seconds ? <span> · ≈ {fmtDur(step.seconds)}</span> : null}
+            </p>
             {spanishName(ex) && name === ex.name && <p className="center muted es-sub">{spanishName(ex)}</p>}
             {lowImpact && ex.lowImpact && <p className="tiny muted center">Variante de bajo impacto · original: {ex.name}</p>}
             {ex.params.length > 0 && (
@@ -308,12 +318,27 @@ export function Workout({ state, update, onClose }: Props) {
                   {ex.repUnit || 'repeticiones'}
                   {ex.perSide ? ` ${ex.perSide}` : ''}
                 </span>
-                <small>{fmtClock(shown / 1000)}</small>
+                <small>
+                  {fmtClock(shown / 1000)}
+                  {step.timeSource === 'reps' ? ' · tiempo estimado' : ''}
+                </small>
               </>
             ) : (
               <>
                 <b>{fmtClock(shown / 1000)}</b>
-                <span>{isRest ? 'descanso' : status === 'listo' ? 'listo' : status === 'pausado' ? 'en pausa' : 'en curso'}</span>
+                <span>
+                  {isRest
+                    ? step.restKind === 'bloque'
+                      ? 'prepárate'
+                      : 'descanso'
+                    : step.timeSource === 'defecto'
+                      ? 'sin cantidad indicada'
+                      : status === 'listo'
+                        ? 'listo'
+                        : status === 'pausado'
+                          ? 'en pausa'
+                          : 'en curso'}
+                </span>
                 {!isRest && ex.perSide && <small>{ex.perSide}</small>}
               </>
             )}

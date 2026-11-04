@@ -451,3 +451,5 @@ details.card summary { font-weight: 700; cursor: pointer; min-height: 32px; }
 .pending-box { background: var(--warn-bg); border: 1.5px dashed var(--warn); }
 .pending-box p { margin: 6px 0; }
 .start-pos { font-weight: 600; }
+.wo-amount { text-align: center; font-size: 20px; font-weight: 800; color: var(--accent); margin: -4px 0 0; }
+.wo-amount span { font-size: 15px; color: var(--muted); font-weight: 600; }

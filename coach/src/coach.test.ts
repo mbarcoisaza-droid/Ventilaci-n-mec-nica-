@@ -354,3 +354,28 @@ describe('Fichas visuales de los ejercicios', () => {
     expect(s1.exerciseLib?.['palanca-pierna']).toBeTruthy();
   });
 });
+
+describe('Entrenamiento corrido', () => {
+  it('da tiempo a los ejercicios por repeticiones y añade «Prepárate» entre bloques', async () => {
+    const { trainerRoutines } = await import('./seed');
+    const espalda = trainerRoutines().find((r) => r.name.startsWith('Espalda'))!;
+    const flow = { continuous: true, secPerRep: 3, transition: 10, defaultWork: 30 };
+    const steps = buildSteps(espalda, flow);
+    const work = steps.filter((s) => s.kind === 'trabajo');
+    // ningún ejercicio queda sin tiempo: el temporizador siempre puede avanzar solo
+    expect(work.every((s) => (s.seconds ?? 0) > 0)).toBe(true);
+    const lat = work.find((s) => s.exercise.name === 'Reverse Grip Lat Pulldown' && s.reps === 12)!;
+    expect(lat).toMatchObject({ reps: 12, seconds: 45, timeSource: 'reps' }); // 12–15 reps × 3 s
+    const twist = work.find((s) => s.exercise.libKey === 'giro-ruso')!;
+    expect(twist.seconds).toBe(15 * 3 * 2); // a cada lado
+    const warmup = work.find((s) => s.block.title.includes('Series de calentamiento'))!;
+    expect(warmup.timeSource).toBe('defecto'); // repeticiones no indicadas → 30 s por defecto
+    expect(warmup.seconds).toBe(30);
+    const transitions = steps.filter((s) => s.restKind === 'bloque');
+    expect(transitions.length).toBe(espalda.blocks.length - 1);
+    // las repeticiones configuradas no cambian
+    expect(espalda.blocks[2].exercises[0]).toMatchObject({ reps: 12, repsMax: 15 });
+    // sin modo corrido, los ejercicios por repeticiones no tienen tiempo
+    expect(buildSteps(espalda).find((s) => s.reps === 12)!.seconds).toBeNull();
+  });
+});
