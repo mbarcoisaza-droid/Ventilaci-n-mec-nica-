@@ -8,6 +8,7 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "build:single": "tsc --noEmit && vite build --mode single",
+    "build:kaplan": "tsc --noEmit && vite build --mode kaplan-single",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },
