@@ -150,3 +150,19 @@ export function download(name: string, content: string, type: string) {
   a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 2000);
 }
+
+/** En el teléfono abre el menú «Compartir» (para enviar el archivo a Calendario o Archivos); si no, lo descarga. */
+export async function shareOrDownload(name: string, content: string, type: string): Promise<'shared' | 'downloaded' | 'cancelled'> {
+  try {
+    const file = new File([content], name, { type });
+    const nav = navigator as Navigator & { canShare?: (d: { files: File[] }) => boolean };
+    if (nav.canShare?.({ files: [file] }) && nav.share) {
+      await nav.share({ files: [file], title: 'Plan Kaplan' });
+      return 'shared';
+    }
+  } catch (e) {
+    if ((e as Error).name === 'AbortError') return 'cancelled';
+  }
+  download(name, content, type);
+  return 'downloaded';
+}

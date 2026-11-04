@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react';
 import { buildICS } from '../alarms';
 import { addDays, DOW_SHORT, fmtShort, ISODate, rangeDates, weekdayMon } from '../dates';
-import { download, exportDaysCSV, exportJSON, exportReviewCSV, importCSV, importJSON } from '../io';
+import { download, shareOrDownload, exportDaysCSV, exportJSON, exportReviewCSV, importCSV, importJSON } from '../io';
 import { AppState, DAY_TYPES, DayType, defaultState, Settings, TYPE_LABEL, uid } from '../model';
 import { isIOS, isStandalone, notifPermission, requestNotif, showNotif, beep } from '../notify';
 import { conflicts, getLog, Plan, sleepHours } from '../plan';
@@ -182,12 +182,13 @@ function AlarmSection({ s, update, toast, plan, open }: { s: AppState; update: U
   const [range, setRange] = useState(14);
   const set = (p: Partial<typeof a>) => update((x) => ({ ...x, alarms: { ...x.alarms, ...p } }));
   const ios = isIOS();
-  const exportIcs = () => {
+  const exportIcs = async () => {
     const from = plan.today < s.settings.startDate ? s.settings.startDate : plan.today;
     const to = range === 0 ? s.settings.examDate : addDays(from, range - 1);
     const { ics, count } = buildICS(s, from, to > s.settings.examDate ? s.settings.examDate : to);
-    download(`plan-kaplan-${from}.ics`, ics, 'text/calendar;charset=utf-8');
-    toast(`${count} eventos exportados. Ábrelo para añadirlos a tu calendario.`);
+    const r = await shareOrDownload(`plan-kaplan-${from}.ics`, ics, 'text/calendar');
+    if (r === 'cancelled') return;
+    toast(r === 'shared' ? `${count} eventos listos: elige Calendario o «Guardar en Archivos».` : `${count} eventos descargados: abre el archivo para añadirlos al calendario.`);
   };
   const lead = (k: 'kaplan' | 'gym' | 'sleepPrep', label: string, help: string) => (
     <div className="row between" style={{ padding: '6px 0' }}>
@@ -249,6 +250,27 @@ function AlarmSection({ s, update, toast, plan, open }: { s: AppState; update: U
           <option value={0}>Hasta el examen</option>
         </select>
         <button className="btn primary" onClick={exportIcs}>Exportar .ics</button>
+      </div>
+      <div className="banner info small" style={{ marginTop: 8 }}>
+        <div>
+          <b>Cómo añadirlos al calendario</b>
+          <ol style={{ margin: '4px 0 0', paddingLeft: 18 }}>
+            {ios ? (
+              <>
+                <li>Toca «Exportar .ics». Se abre el menú Compartir.</li>
+                <li>Elige <b>Calendario</b> si aparece; si no, <b>«Guardar en Archivos»</b>.</li>
+                <li>En la app <b>Archivos</b>, toca el archivo → <b>«Añadir todo»</b> → elige el calendario → <b>OK</b>.</li>
+              </>
+            ) : (
+              <>
+                <li>Toca «Exportar .ics». Elige <b>Google Calendar</b> en el menú o abre el archivo descargado.</li>
+                <li>Confirma <b>«Importar»</b> y elige el calendario.</li>
+                <li>Si no se abre: en el computador ve a calendar.google.com → ⚙️ Configuración → <b>Importar y exportar</b> → sube el archivo.</li>
+              </>
+            )}
+          </ol>
+          <p style={{ margin: '6px 0 0' }}>Comprueba que el calendario tenga activadas sus notificaciones en los ajustes del teléfono.</p>
+        </div>
       </div>
       <p className="tiny muted" style={{ marginBottom: 0 }}>
         Incluye bloques Kaplan y de ejercicio con aviso, rutina para dormir, revisión de pendientes e hitos. El aviso de meta semanal depende de tu progreso real y solo funciona dentro de la app. Si cambias turnos o rutinas, vuelve a exportar (los eventos conservan su identificador, así que muchos calendarios los actualizan en lugar de duplicarlos).
