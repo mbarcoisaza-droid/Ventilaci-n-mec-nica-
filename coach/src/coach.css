@@ -431,3 +431,23 @@ details.card summary { font-weight: 700; cursor: pointer; min-height: 32px; }
 .prop { fill: var(--surface-2); stroke: var(--muted); stroke-width: 1.2; }
 .es-name { font-style: italic; }
 .es-sub { margin: -8px 0 0; font-size: 15px; }
+
+/* equipo y estado pendiente en las ilustraciones */
+.equip { fill: var(--accent); stroke: none; }
+.equip.far, .dumbbell.far { opacity: 0.45; }
+.equip .plate { fill: var(--surface); stroke: var(--accent); stroke-width: 2; }
+.equip .handle { fill: none; stroke: var(--accent); stroke-width: 1.6; }
+.equip.pad { fill: var(--accent); }
+.band { stroke: #d6336c; stroke-width: 1.8; fill: none; stroke-linecap: round; }
+.band.loop { stroke-width: 1.6; }
+.cable { stroke: var(--muted); stroke-width: 1; }
+.bar { stroke: var(--accent); stroke-width: 2.4; stroke-linecap: round; }
+.neutral .limb, .neutral .head { opacity: 0.22; }
+.pending-badge {
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); background: var(--warn-bg); color: var(--warn);
+  border: 1.5px dashed var(--warn); border-radius: 12px; padding: 6px 12px; font-weight: 800; font-size: 14px; white-space: nowrap;
+}
+.ex-thumb .pending-badge { display: none; }
+.pending-box { background: var(--warn-bg); border: 1.5px dashed var(--warn); }
+.pending-box p { margin: 6px 0; }
+.start-pos { font-weight: 600; }

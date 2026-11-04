@@ -1,6 +1,6 @@
 /** Estado persistente en localStorage. */
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { AppState, defaultState, migrate } from './model';
+import { AppState, defaultState, migrate, syncLibrary } from './model';
 import { withSeeds } from './seed';
 
 const KEY = 'mi-coach-v1';
@@ -8,11 +8,11 @@ const KEY = 'mi-coach-v1';
 function load(): AppState {
   try {
     const raw = localStorage.getItem(KEY);
-    if (raw) return withSeeds(migrate(JSON.parse(raw)));
+    if (raw) return syncLibrary(withSeeds(migrate(JSON.parse(raw))));
   } catch {
     /* almacenamiento no disponible o dañado: se parte de los datos de ejemplo */
   }
-  return withSeeds(defaultState());
+  return syncLibrary(withSeeds(defaultState()));
 }
 
 export function useAppState() {

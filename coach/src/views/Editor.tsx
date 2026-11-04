@@ -205,6 +205,8 @@ export function RoutineEditor({ initial, focusExercise, onSave, onCancel, isNew 
 
 function ExerciseEditor({ ex, onChange, onDelete, onClose }: { ex: Exercise; onChange: (fn: (e: Exercise) => Exercise) => void; onDelete: () => void; onClose: () => void }) {
   const set = (p: Partial<Exercise>) => onChange((e) => ({ ...e, ...p }));
+  /** Cambios de descripción o gráfico: quedan como propios y la biblioteca no los sobrescribe. */
+  const setC = (p: Partial<Exercise>) => onChange((e) => ({ ...e, ...p, custom: true }));
   const setParam = (id: string, p: Partial<Param>) => onChange((e) => ({ ...e, params: e.params.map((x) => (x.id === id ? { ...x, ...p } : x)) }));
   const vid = parseYouTubeId(ex.videoUrl);
   const [preview, setPreview] = useState(false);
@@ -326,7 +328,7 @@ function ExerciseEditor({ ex, onChange, onDelete, onClose }: { ex: Exercise; onC
         <input value={ex.videoUrl} onChange={(e) => set({ videoUrl: e.target.value.trim() })} placeholder="https://youtu.be/…" inputMode="url" />
       </Field>
       <Field label="Ilustración (si no hay video)">
-        <select value={ex.pose} onChange={(e) => set({ pose: e.target.value })}>
+        <select value={ex.pose} onChange={(e) => setC({ pose: e.target.value })}>
           {POSE_OPTIONS.map((o) => (
             <option key={o.key} value={o.key}>
               {o.label}
@@ -341,25 +343,33 @@ function ExerciseEditor({ ex, onChange, onDelete, onClose }: { ex: Exercise; onC
 
       <h4>Explicación</h4>
       <Field label="Descripción breve">
-        <textarea rows={2} value={ex.summary} onChange={(e) => set({ summary: e.target.value })} />
+        <textarea rows={2} value={ex.summary} onChange={(e) => setC({ summary: e.target.value })} />
       </Field>
-      <span className="field-label">Instrucciones numeradas</span>
-      <ListEditor items={ex.steps} onChange={(steps) => set({ steps })} placeholder="Paso" numbered />
-      <span className="field-label">Puntos clave</span>
-      <ListEditor items={ex.keyPoints} onChange={(keyPoints) => set({ keyPoints })} placeholder="Punto clave" />
+      <Field label="Posición inicial">
+        <textarea rows={2} value={ex.start} onChange={(e) => setC({ start: e.target.value })} />
+      </Field>
+      <span className="field-label">Ejecución (pasos numerados)</span>
+      <ListEditor items={ex.steps} onChange={(steps) => setC({ steps })} placeholder="Paso" numbered />
+      <Field label="Respiración (opcional)">
+        <input value={ex.breathing} onChange={(e) => setC({ breathing: e.target.value })} />
+      </Field>
+      <span className="field-label">Claves de técnica</span>
+      <ListEditor items={ex.keyPoints} onChange={(keyPoints) => setC({ keyPoints })} placeholder="Punto clave" />
       <span className="field-label">Errores frecuentes</span>
-      <ListEditor items={ex.errors} onChange={(errors) => set({ errors })} placeholder="Error frecuente" />
+      <ListEditor items={ex.errors} onChange={(errors) => setC({ errors })} placeholder="Error frecuente" />
+      <span className="field-label">Equipo</span>
+      <ListEditor items={ex.equipment} onChange={(equipment) => setC({ equipment })} placeholder="Equipo" />
 
       <h4>Variantes</h4>
       {(
         [
-          ['easier', 'Más fácil'],
+          ['easier', 'Más sencilla'],
           ['harder', 'Más difícil'],
           ['lowImpact', 'Bajo impacto'],
         ] as const
       ).map(([k, label]) => (
         <Field key={k} label={label}>
-          <input value={ex[k]?.name ?? ''} onChange={(e) => set({ [k]: e.target.value ? { ...(ex[k] ?? {}), name: e.target.value } : undefined } as Partial<Exercise>)} placeholder="Sin variante" />
+          <input value={ex[k]?.name ?? ''} onChange={(e) => setC({ [k]: e.target.value ? { ...(ex[k] ?? {}), name: e.target.value } : undefined } as Partial<Exercise>)} placeholder="Sin variante" />
         </Field>
       ))}
 

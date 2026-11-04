@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { upsertRoutine } from '../actions';
 import { Field, Sheet, Stepper, Toggle } from '../components/ui';
 import { DOW_SHORT, WEEK_ORDER, todayISO } from '../dates';
-import { AppState, EQUIPMENT, Level, defaultState, ensurePlanSessions, migrate, sampleRoutine } from '../model';
+import { AppState, EQUIPMENT, Level, defaultState, ensurePlanSessions, migrate, sampleRoutine, syncLibrary } from '../model';
 import { isIOS, isStandalone, notifPermission, notifSupported, requestNotif } from '../notify';
 import { buildICS, download } from '../progress';
 import { withSeeds } from '../seed';
@@ -33,7 +33,7 @@ export function Settings({ state, update, replace }: { state: AppState; update: 
     const reader = new FileReader();
     reader.onload = () => {
       try {
-        const data = withSeeds(migrate(JSON.parse(String(reader.result))));
+        const data = syncLibrary(withSeeds(migrate(JSON.parse(String(reader.result)))));
         replace(data);
         setMsg('Copia restaurada correctamente.');
       } catch {
@@ -236,7 +236,7 @@ export function Settings({ state, update, replace }: { state: AppState; update: 
             <button
               className="btn danger"
               onClick={() => {
-                replace(withSeeds({ ...defaultState(), onboarded: true }));
+                replace(syncLibrary(withSeeds({ ...defaultState(), onboarded: true })));
                 setReset(false);
                 setMsg('Datos borrados.');
               }}

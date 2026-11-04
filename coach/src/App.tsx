@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { startWorkout, upsertRoutine } from './actions';
 import { Sheet } from './components/ui';
 import { dow, nowHM, todayISO } from './dates';
-import { AppState, Routine, blankRoutine, ensurePlanSessions } from './model';
+import { AppState, Routine, blankRoutine, ensurePlanSessions, syncRoutine } from './model';
 import { beep, notifPermission, showNotif } from './notify';
 import { findIssues } from './sequence';
 import { useAppState } from './store';
@@ -145,11 +145,12 @@ export default function App() {
       <ImportView
         onCancel={() => setOverlay(null)}
         onCreate={(r, edit) => {
-          if (edit) setOverlay({ kind: 'editar', routine: r, isNew: true });
-          else saveRoutine(r);
+          const synced = syncRoutine(r, state.exerciseLib);
+          if (edit) setOverlay({ kind: 'editar', routine: synced, isNew: true });
+          else saveRoutine(synced);
         }}
         onCreateMany={(rs) => {
-          update((s) => rs.reduce((acc, r) => upsertRoutine(acc, r), s));
+          update((s) => rs.reduce((acc, r) => upsertRoutine(acc, syncRoutine(r, s.exerciseLib)), s));
           setOverlay(null);
           setTab('rutinas');
         }}

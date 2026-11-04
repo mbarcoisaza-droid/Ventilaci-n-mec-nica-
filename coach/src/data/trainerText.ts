@@ -3,7 +3,7 @@
  * (texto original, sin los avisos de sesiones no realizadas). La app las convierte con el importador;
  * lo que no está claro queda marcado para confirmar.
  * «brazos y abdomen gym» no venía en la versión en inglés: sus nombres se tradujeron cuando tienen
- * un equivalente claro; «Flexiones en banco» se deja en español porque es ambiguo.
+ * un equivalente claro («Flexiones en banco» = Bench Push-Up, flexión con manos apoyadas en banco).
  */
 export const TRAINER_SEED_ID = 'entrenador-2024-en';
 /** Paquete anterior (nombres en español) que esta versión reemplaza. */
@@ -294,7 +294,7 @@ mancuerna 5 lb
 
 de seguido al siguiente ejercicio
 
-A2) Flexiones en banco
+A2) Bench Push-Up
 
 4 rondas
 

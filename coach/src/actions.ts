@@ -1,6 +1,7 @@
 /** Transformaciones puras del estado. */
 import { todayISO } from './dates';
-import { AppState, HistoryEntry, Routine, Session, uid } from './model';
+import { LibContent } from './library';
+import { AppState, Exercise, HistoryEntry, Routine, Session, contentFields, groupKeyOf, stripAutoReview, uid } from './model';
 
 export function upsertRoutine(s: AppState, r: Routine): AppState {
   const rr = { ...r, updatedAt: new Date().toISOString() };
@@ -105,3 +106,46 @@ export function finishWorkout(s: AppState, entry: HistoryEntry): AppState {
     sessions: s.sessions.map((x) => (x.id === entry.sessionId ? { ...x, status: 'completada', historyId: entry.id } : x)),
   };
 }
+
+/**
+ * Guarda la ficha (gráfico + descripción + video) de un ejercicio en todas las rutinas donde aparece,
+ * con cualquiera de sus nombres, y la recuerda para rutinas futuras. No cambia series, repeticiones ni tiempos.
+ */
+export function applyExerciseContent(s: AppState, key: string, content: LibContent, opts: { videoUrl?: string; confirm: boolean }): AppState {
+  const patch = (e: Exercise): Exercise =>
+    groupKeyOf(e) !== key
+      ? e
+      : {
+          ...e,
+          ...contentFields(content),
+          videoUrl: opts.videoUrl ?? e.videoUrl,
+          custom: true,
+          review: opts.confirm ? stripAutoReview(e.review) : e.review,
+        };
+  const routines = s.routines.map((r) =>
+    r.blocks.some((b) => b.exercises.some((e) => groupKeyOf(e) === key))
+      ? { ...r, updatedAt: new Date().toISOString(), blocks: r.blocks.map((b) => ({ ...b, exercises: b.exercises.map(patch) })) }
+      : r,
+  );
+  return {
+    ...s,
+    routines,
+    active: s.active ? { ...s.active, snapshot: { ...s.active.snapshot, blocks: s.active.snapshot.blocks.map((b) => ({ ...b, exercises: b.exercises.map(patch) })) } } : null,
+    exerciseLib: { ...(s.exerciseLib ?? {}), [key]: content },
+  };
+}
+
+/** Contenido actual de un ejercicio en forma de ficha. */
+export const contentOf = (e: Exercise): LibContent => ({
+  summary: e.summary,
+  start: e.start,
+  steps: e.steps,
+  breathing: e.breathing,
+  keyPoints: e.keyPoints,
+  errors: e.errors,
+  equipment: e.equipment,
+  pose: e.pose,
+  easier: e.easier,
+  harder: e.harder,
+  lowImpact: e.lowImpact,
+});

@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { finishWorkout, discardWorkout } from '../actions';
 import { ExerciseInfo, ExerciseMedia } from '../components/ExerciseMedia';
+import { CardEditor } from '../components/CardEditor';
 import { Thumb } from '../components/Illustration';
 import { Sheet } from '../components/ui';
 import { fmtClock, fmtDur, todayISO } from '../dates';
@@ -44,6 +45,7 @@ export function Workout({ state, update, onClose }: Props) {
   const [discomfort, setDiscomfort] = useState<Discomfort | null>(null);
   const [stopSheet, setStopSheet] = useState(false);
   const [showInfo, setShowInfo] = useState(false);
+  const [card, setCard] = useState(false);
   const [endedAt, setEndedAt] = useState<string | null>(null);
 
   const endAt = useRef(0);
@@ -354,16 +356,11 @@ export function Workout({ state, update, onClose }: Props) {
         {!isRest && (
           <section className="wo-guide">
             <ExerciseMedia ex={ex} compact />
-            <button className="btn ghost wide" onClick={() => setShowInfo((v) => !v)} aria-expanded={showInfo}>
-              {showInfo ? 'Ocultar instrucciones' : 'Ver instrucciones'}
-            </button>
-            {showInfo && <ExerciseInfo ex={ex} lowImpact={lowImpact} />}
-            {!showInfo && ex.steps.length > 0 && (
-              <ol className="steps short">
-                {ex.steps.slice(0, 3).map((s, i) => (
-                  <li key={i}>{s}</li>
-                ))}
-              </ol>
+            <ExerciseInfo ex={ex} lowImpact={lowImpact} compact={!showInfo} onEditCard={() => (status === 'corriendo' && pause(), setCard(true))} />
+            {ex.steps.length > 0 && (
+              <button className="btn ghost wide" onClick={() => setShowInfo((v) => !v)} aria-expanded={showInfo}>
+                {showInfo ? 'Menos detalles' : 'Respiración, claves, errores y variantes'}
+              </button>
             )}
           </section>
         )}
@@ -377,6 +374,7 @@ export function Workout({ state, update, onClose }: Props) {
         </button>
       </main>
 
+      {card && step && <CardEditor state={state} update={update} ex={step.exercise} onClose={() => setCard(false)} />}
       {stopSheet && (
         <StopSheet
           onClose={() => setStopSheet(false)}

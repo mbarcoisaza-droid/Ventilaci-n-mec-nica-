@@ -1,6 +1,6 @@
 /** Modelo de datos de Mi Coach. Todo se guarda en el dispositivo (localStorage). */
 import { addDays, todayISO, weekStart } from './dates';
-import { LibEntry, libByKey } from './library';
+import { LIBRARY, LIB_VERSION, LibContent, LibEntry, PENDING_LABEL, PENDING_POSE, findLib, libByKey, nameKey } from './library';
 
 export type BlockKind = 'calentamiento' | 'fuerza' | 'circuito' | 'cardio' | 'enfriamiento' | 'otro';
 export const BLOCK_LABEL: Record<BlockKind, string> = {
@@ -63,6 +63,14 @@ export interface Exercise {
   harder?: Variant;
   lowImpact?: Variant;
   coachNotes: string;
+  /** Posición inicial. */
+  start: string;
+  /** Respiración sugerida. */
+  breathing: string;
+  /** Equipo necesario. */
+  equipment: string[];
+  /** Descripción o gráfico editados a mano: la biblioteca no los sobrescribe. */
+  custom?: boolean;
   /** Motivo por el que necesita confirmación; null si está confirmado. */
   review: string | null;
 }
@@ -209,6 +217,10 @@ export interface AppState {
   onboarded: boolean;
   /** Paquetes de rutinas ya cargados (para no duplicarlos). */
   seeds: string[];
+  /** Versión de la biblioteca aplicada a los ejercicios guardados. */
+  libVersion?: number;
+  /** Fichas completadas o editadas por el entrenador (por clave de ejercicio): comunes a todas las rutinas. */
+  exerciseLib?: Record<string, LibContent>;
   updatedAt: string;
 }
 
@@ -237,26 +249,99 @@ export function newExercise(p: Partial<Exercise> = {}): Exercise {
     videoUrl: '',
     pose: 'generico',
     coachNotes: '',
+    start: '',
+    breathing: '',
+    equipment: [],
     review: null,
     ...p,
   };
 }
 
 /** Crea un ejercicio con la información de la biblioteca. */
+/** Campos de contenido (gráfico y descripción) que comparte un ejercicio con su ficha. */
+export function contentFields(c: Partial<LibContent>) {
+  return {
+    summary: c.summary ?? '',
+    start: c.start ?? '',
+    steps: [...(c.steps ?? [])],
+    breathing: c.breathing ?? '',
+    keyPoints: [...(c.keyPoints ?? [])],
+    errors: [...(c.errors ?? [])],
+    equipment: [...(c.equipment ?? [])],
+    pose: c.pose ?? PENDING_POSE,
+    easier: c.easier && { ...c.easier },
+    harder: c.harder && { ...c.harder },
+    lowImpact: c.lowImpact && { ...c.lowImpact },
+  };
+}
+
+export const pendingReview = (lib: LibEntry) => `${PENDING_LABEL}: ${lib.pending}`;
+export const NO_LIB_REVIEW = `${PENDING_LABEL}: ejercicio sin ficha. El entrenador debe agregar la descripción.`;
+/** Avisos generados automáticamente sobre el movimiento (se recalculan al sincronizar). */
+const autoReviews = () => [
+  ...LIBRARY.filter((l) => l.pending).map(pendingReview),
+  NO_LIB_REVIEW,
+  'Ejercicio no reconocido: confirma el movimiento y añade las instrucciones.',
+  'Nombre poco claro: confirma con el entrenador qué estiramiento es y cómo se hace.',
+];
+export const stripAutoReview = (r: string | null) => {
+  if (!r) return null;
+  let out = r;
+  for (const a of autoReviews()) out = out.split(a).join(' ');
+  out = out.replace(/\s+/g, ' ').trim();
+  return out || null;
+};
+
 export function fromLib(lib: LibEntry, p: Partial<Exercise> = {}): Exercise {
   return newExercise({
     name: lib.name,
     libKey: lib.key,
-    summary: lib.summary,
-    steps: [...lib.steps],
-    keyPoints: [...lib.keyPoints],
-    errors: [...lib.errors],
-    pose: lib.pose,
-    easier: lib.easier && { ...lib.easier },
-    harder: lib.harder && { ...lib.harder },
-    lowImpact: lib.lowImpact && { ...lib.lowImpact },
+    ...contentFields(lib),
+    review: lib.pending ? pendingReview(lib) : null,
     ...p,
   });
+}
+
+/** Clave que agrupa un ejercicio con sus nombres equivalentes (español/inglés). */
+export const groupKeyOf = (ex: { libKey?: string; name: string }) => ex.libKey ?? `n:${nameKey(ex.name)}`;
+
+/**
+ * Actualiza el gráfico y la descripción de un ejercicio a partir de su ficha (o de la edición del entrenador).
+ * Nunca cambia nombre, series, repeticiones, pesos, descansos, tiempos, video ni notas.
+ */
+export function syncExercise(ex: Exercise, overrides: Record<string, LibContent> = {}): Exercise {
+  const lib = findLib(ex.name) ?? libByKey(ex.libKey);
+  const ownContent = ex.custom || (!ex.libKey && ex.steps.length > 0);
+  if (!lib) {
+    if (ownContent) return ex;
+    const ov = overrides[groupKeyOf(ex)];
+    if (ov) return { ...ex, ...contentFields(ov), custom: true, review: stripAutoReview(ex.review) };
+    return { ...ex, pose: PENDING_POSE, review: [stripAutoReview(ex.review), NO_LIB_REVIEW].filter(Boolean).join(' ') };
+  }
+  if (ownContent) return { ...ex, libKey: lib.key };
+  const ov = overrides[lib.key];
+  if (ov) return { ...ex, libKey: lib.key, ...contentFields(ov), custom: true, review: stripAutoReview(ex.review) };
+  const rest = stripAutoReview(ex.review);
+  if (lib.pending) {
+    return { ...ex, libKey: lib.key, ...contentFields({ equipment: lib.equipment, pose: PENDING_POSE }), review: [rest, pendingReview(lib)].filter(Boolean).join(' ') };
+  }
+  return { ...ex, libKey: lib.key, ...contentFields(lib), review: rest };
+}
+
+export function syncRoutine(r: Routine, overrides: Record<string, LibContent> = {}): Routine {
+  return { ...r, blocks: r.blocks.map((b) => ({ ...b, exercises: b.exercises.map((e) => syncExercise(e, overrides)) })) };
+}
+
+/** Aplica la versión actual de la biblioteca a todas las rutinas guardadas (una vez por versión). */
+export function syncLibrary(s: AppState): AppState {
+  if ((s.libVersion ?? 1) >= LIB_VERSION) return s;
+  const ov = s.exerciseLib ?? {};
+  return {
+    ...s,
+    routines: s.routines.map((r) => syncRoutine(r, ov)),
+    active: s.active ? { ...s.active, snapshot: syncRoutine(s.active.snapshot, ov) } : null,
+    libVersion: LIB_VERSION,
+  };
 }
 
 export function newBlock(kind: BlockKind, p: Partial<Block> = {}): Block {
@@ -350,8 +435,8 @@ export function sampleRoutine(): Routine {
       }),
       newBlock('enfriamiento', {
         exercises: [
-          newExercise({ name: 'Estiramiento de la vía anterior', seconds: 60, pose: 'estiramiento', review: AMBIGUOUS }),
-          newExercise({ name: 'Estiramiento de hombros en caja', seconds: 60, pose: 'estiramiento', review: AMBIGUOUS }),
+          fromLib(L('via-anterior'), { name: 'Estiramiento de la vía anterior', seconds: 60 }),
+          fromLib(L('hombros-caja'), { name: 'Estiramiento de hombros en caja', seconds: 60 }),
           fromLib(L('cobra'), { seconds: 20 }),
         ],
       }),
@@ -393,7 +478,16 @@ export function normalizeRoutine(r: Routine): Routine {
     comments: r.comments ?? [],
     blocks: (r.blocks ?? []).map((b) => ({
       ...b,
-      exercises: (b.exercises ?? []).map((e) => ({ ...newExercise(), ...e, repsMax: e.repsMax ?? null, repUnit: e.repUnit ?? '', perSide: e.perSide ?? '' })),
+      exercises: (b.exercises ?? []).map((e) => ({
+        ...newExercise(),
+        ...e,
+        repsMax: e.repsMax ?? null,
+        repUnit: e.repUnit ?? '',
+        perSide: e.perSide ?? '',
+        start: e.start ?? '',
+        breathing: e.breathing ?? '',
+        equipment: e.equipment ?? [],
+      })),
     })),
   };
 }

@@ -3,8 +3,8 @@
  * con instrucciones numeradas, puntos clave y errores frecuentes.
  */
 import { useEffect, useRef, useState } from 'react';
-import { spanishName } from '../library';
-import { Exercise } from '../model';
+import { PENDING_LABEL, PENDING_POSE, altName, libByKey } from '../library';
+import { Exercise, stripAutoReview } from '../model';
 import { paramText } from '../sequence';
 import { embedUrl, parseYouTubeId, parseYouTubeStart } from '../youtube';
 import { Illustration } from './Illustration';
@@ -185,8 +185,11 @@ export function ExerciseMedia({ ex, compact }: { ex: Exercise; compact?: boolean
   );
 }
 
-/** Explicación escrita del ejercicio. */
-export function ExerciseInfo({ ex, lowImpact, hideSteps }: { ex: Exercise; lowImpact?: boolean; hideSteps?: boolean }) {
+/** Explicación escrita del ejercicio: posición inicial, ejecución, respiración, claves, errores, equipo y variante. */
+export function ExerciseInfo({ ex, lowImpact, compact, onEditCard }: { ex: Exercise; lowImpact?: boolean; compact?: boolean; onEditCard?: () => void }) {
+  const alt = altName(ex);
+  const lib = libByKey(ex.libKey);
+  const pending = ex.pose === PENDING_POSE && !ex.steps.length;
   return (
     <div className="ex-info">
       {lowImpact && ex.lowImpact && (
@@ -195,8 +198,24 @@ export function ExerciseInfo({ ex, lowImpact, hideSteps }: { ex: Exercise; lowIm
           {ex.lowImpact.note ? ` · ${ex.lowImpact.note}` : ''}
         </p>
       )}
-      {spanishName(ex) && <p className="tiny muted">En español: {spanishName(ex)}</p>}
-      {ex.review && <p className="notice warn">⚠ {ex.review}</p>}
+      {alt && (
+        <p className="tiny muted">
+          {alt.label}: {alt.name}
+        </p>
+      )}
+      {(pending ? stripAutoReview(ex.review) : ex.review) && <p className="notice warn">⚠ {pending ? stripAutoReview(ex.review) : ex.review}</p>}
+      {pending && (
+        <div className="notice pending-box">
+          <b>{PENDING_LABEL}</b>
+          <p>{lib?.pending ?? 'Este ejercicio aún no tiene descripción. El entrenador puede agregarla junto con un video o una ilustración.'}</p>
+          {lib?.candidate && <p className="tiny">Variante propuesta para revisar: «{lib.candidate.label}».</p>}
+          {onEditCard && (
+            <button type="button" className="btn sm primary" onClick={onEditCard}>
+              ✎ Completar descripción
+            </button>
+          )}
+        </div>
+      )}
       {ex.summary && <p className="summary">{ex.summary}</p>}
       {ex.params.length > 0 && (
         <ul className="params">
@@ -209,24 +228,33 @@ export function ExerciseInfo({ ex, lowImpact, hideSteps }: { ex: Exercise; lowIm
           ))}
         </ul>
       )}
-      {!hideSteps && (
+      {ex.start && (
         <>
-          <h4>Cómo se hace</h4>
-          {ex.steps.length ? (
+          <h4>Posición inicial</h4>
+          <p className="start-pos">{ex.start}</p>
+        </>
+      )}
+      {ex.steps.length > 0 && (
+        <>
+          <h4>Ejecución</h4>
+          <ol className="steps">
+            {ex.steps.map((s, i) => (
+              <li key={i}>{s}</li>
+            ))}
+          </ol>
+        </>
+      )}
+      {!compact && (
+        <>
+          {ex.breathing && (
             <>
-              <ol className="steps">
-                {ex.steps.map((s, i) => (
-                  <li key={i}>{s}</li>
-                ))}
-              </ol>
-              {ex.libKey && <p className="tiny muted">Descripción general de la biblioteca de la app; tu entrenador puede ajustarla.</p>}
+              <h4>Respiración</h4>
+              <p>{ex.breathing}</p>
             </>
-          ) : (
-            <p className="muted">Instrucciones pendientes: el entrenador debe describir este movimiento. Puedes añadirlas en «Editar».</p>
           )}
           {ex.keyPoints.length > 0 && (
             <>
-              <h4>Puntos clave</h4>
+              <h4>Claves de técnica</h4>
               <ul className="bullets ok">
                 {ex.keyPoints.map((s, i) => (
                   <li key={i}>{s}</li>
@@ -246,13 +274,25 @@ export function ExerciseInfo({ ex, lowImpact, hideSteps }: { ex: Exercise; lowIm
           )}
         </>
       )}
-      {(ex.easier || ex.harder || ex.lowImpact) && (
+      {ex.equipment.length > 0 && (
+        <>
+          <h4>Equipo</h4>
+          <div className="chips">
+            {ex.equipment.map((q, i) => (
+              <span key={i} className="chip">
+                {q}
+              </span>
+            ))}
+          </div>
+        </>
+      )}
+      {!compact && (ex.easier || ex.harder || ex.lowImpact) && (
         <>
           <h4>Variantes</h4>
           <ul className="variants">
             {ex.easier && (
               <li>
-                <span className="tag">Más fácil</span> {ex.easier.name}
+                <span className="tag">Más sencilla</span> {ex.easier.name}
               </li>
             )}
             {ex.harder && (
@@ -260,13 +300,12 @@ export function ExerciseInfo({ ex, lowImpact, hideSteps }: { ex: Exercise; lowIm
                 <span className="tag">Más difícil</span> {ex.harder.name}
               </li>
             )}
-            {ex.lowImpact && (
+            {ex.lowImpact && ex.lowImpact.name !== ex.easier?.name && (
               <li>
                 <span className="tag">Bajo impacto</span> {ex.lowImpact.name}
               </li>
             )}
           </ul>
-          <p className="tiny muted">Las variantes son opciones para revisar con tu entrenador.</p>
         </>
       )}
       {ex.coachNotes && (
@@ -274,6 +313,11 @@ export function ExerciseInfo({ ex, lowImpact, hideSteps }: { ex: Exercise; lowIm
           <b>Nota del entrenador</b>
           <p>{ex.coachNotes}</p>
         </div>
+      )}
+      {onEditCard && !pending && (
+        <button type="button" className="linkbtn" onClick={onEditCard}>
+          ✎ Editar descripción o gráfico (en todas las rutinas)
+        </button>
       )}
     </div>
   );

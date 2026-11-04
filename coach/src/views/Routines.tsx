@@ -1,6 +1,7 @@
 /** Lista de rutinas, detalle de una rutina y revisión previa al entrenamiento. */
 import { useState } from 'react';
 import { deleteRoutine, duplicateRoutine, upsertRoutine } from '../actions';
+import { CardEditor } from '../components/CardEditor';
 import { ExerciseInfo, ExerciseMedia } from '../components/ExerciseMedia';
 import { Thumb } from '../components/Illustration';
 import { Empty, Sheet, Toggle } from '../components/ui';
@@ -139,6 +140,7 @@ export function RoutineDetail({
   onStart: (routineId: string, sessionId: string | null) => void;
 }) {
   const [open, setOpen] = useState<Exercise | null>(null);
+  const [card, setCard] = useState<Exercise | null>(null);
   const [check, setCheck] = useState(false);
   const [comment, setComment] = useState('');
   const save = (r: Routine) => update((s) => upsertRoutine(s, r));
@@ -269,7 +271,14 @@ export function RoutineDetail({
       {open && (
         <Sheet title={displayName(open, routine.useLowImpact)} onClose={() => setOpen(null)} wide>
           <ExerciseMedia ex={open} />
-          <ExerciseInfo ex={open} lowImpact={routine.useLowImpact} />
+          <ExerciseInfo
+            ex={open}
+            lowImpact={routine.useLowImpact}
+            onEditCard={() => {
+              setCard(open);
+              setOpen(null);
+            }}
+          />
           <button
             className="btn"
             onClick={() => {
@@ -277,10 +286,11 @@ export function RoutineDetail({
               onEdit(routine, open.id);
             }}
           >
-            ✎ Editar este ejercicio
+            ✎ Editar series, tiempos y parámetros
           </button>
         </Sheet>
       )}
+      {card && <CardEditor state={state} update={update} ex={card} onClose={() => setCard(null)} />}
 
       {check && (
         <PreStart

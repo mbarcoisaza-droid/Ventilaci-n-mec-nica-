@@ -77,7 +77,7 @@ describe('Biblioteca', () => {
   it('reconoce ejercicios por alias', () => {
     expect(findLib('Escalador de montaña')?.key).toBe('escalador');
     expect(findLib('Giros de cintura')).toBeNull();
-    expect(findLib('Estiramiento de la vía anterior')).toBeNull();
+    expect(findLib('Estiramiento de la vía anterior')?.pending).toBeTruthy();
   });
 });
 
@@ -98,7 +98,8 @@ describe('Importador', () => {
       expect(abs.restBetweenExercises).toBe(10);
       expect(abs.restBetweenRounds).toBe(60);
       expect(abs.exercises).toHaveLength(6);
-      expect(abs.exercises.every((e) => e.seconds === 30 && !e.review)).toBe(true);
+      expect(abs.exercises.every((e) => e.seconds === 30)).toBe(true);
+      expect(abs.exercises.filter((e) => e.review).map((e) => e.libKey)).toEqual(['palanca-pierna']);
       expect(cardio.exercises).toHaveLength(1);
       const tm = cardio.exercises[0];
       expect(tm.libKey).toBe('caminadora');
@@ -146,7 +147,7 @@ describe('Secuencia', () => {
   it('lista los datos pendientes', () => {
     const issues = findIssues(sampleRoutine());
     expect(issues.filter((i) => i.kind === 'parametro')).toHaveLength(2);
-    expect(issues.filter((i) => i.kind === 'ejercicio')).toHaveLength(2);
+    expect(issues.filter((i) => i.kind === 'ejercicio')).toHaveLength(3);
   });
 });
 
@@ -232,10 +233,10 @@ describe('Rutinas del entrenador (nombres en inglés)', () => {
     const tren = all.find((r) => r.name === 'Tren superior')!;
     const abs = tren.blocks.find((b) => b.title === 'H · Abs')!;
     expect(abs).toMatchObject({ kind: 'circuito', rounds: 3, restBetweenExercises: 10, restBetweenRounds: 60 });
-    expect(abs.exercises[0].review).toMatch(/no reconocido/); // knee slide crunch
-    expect(abs.exercises.slice(1).every((e) => !e.review)).toBe(true);
+    expect(abs.exercises[0].review).toMatch(/por confirmar/); // knee slide crunch
+    expect(abs.exercises.filter((e) => e.review).map((e) => e.libKey)).toEqual(['knee-slide-crunch', 'palanca-pierna']);
     const box = all.find((r) => r.name === 'Pierna/cuadriceps')!.blocks.flatMap((b) => b.exercises).find((e) => e.name === 'Box Step-Up')!;
-    expect(box.libKey).toBe('subida-escalon');
+    expect(box.libKey).toBe('box-step-up');
     expect(box.coachNotes).toMatch(/superficie alta/);
     const brazos = all.find((r) => r.name === 'Brazos y abdomen')!;
     expect(brazos.blocks[0].exercises[0]).toMatchObject({ libKey: 'caminadora', seconds: 300 });
@@ -268,5 +269,88 @@ describe('Nombres en inglés', () => {
     expect(englishTitle('Supine leg raise on flat bench')).toBe('Supine Leg Raise on Flat Bench');
     expect(englishTitle('Sentadilla sumo')).toBe('Sentadilla sumo');
     expect(englishTitle('Flexiones en banco')).toBe('Flexiones en banco');
+  });
+});
+
+describe('Fichas visuales de los ejercicios', () => {
+  const LIST = [
+    ['Standing Hip Circle', 'círculo de cadera de pie'], ['Arm Circle', 'círculo de brazos'], ['Skipping', 'saltos suaves'],
+    ['Half Kneeling Hip Flexor Stretch', 'estiramiento del flexor de cadera medio arrodillado'], ['Deep Squat Hold', 'sentadilla profunda sostenida'],
+    ['5 Way Hips', 'movilidad de cadera en cinco direcciones'], ['Shinbox Switch', 'shinbox switch'], ['Anterior Pathway Stretch', 'estiramiento de la vía anterior'],
+    ['Dynamic Straddle Stretch', 'estiramiento dinámico de piernas separadas'], ['Seated Pike Stretch', 'estiramiento de pica sentado'],
+    ['Supine Figure Four Glute Stretch', 'estiramiento de glúteos en figura cuatro'], ['Thomas Stretch', 'thomas stretch'],
+    ['Box Shoulder Stretch', 'estiramiento de hombros en caja'], ['Cobra Stretch', 'estiramiento de cobra'],
+    ['Reverse Grip Lat Pulldown', 'jalón al pecho con agarre inverso'], ['Dumbbell Lateral Raise', 'elevación lateral con mancuernas'],
+    ['Bent Over Supinated Dumbbell Row', 'remo inclinado con mancuernas y agarre supino'], ['Dumbbell Front Raise', 'elevación frontal con mancuernas'],
+    ['Chest Supported Dumbbell Row', 'remo con mancuernas con apoyo en el pecho'], ['Back Supported Dumbbell Shoulder Press', 'press de hombros con mancuernas y espalda apoyada'],
+    ['V-Up', 'abdominal en V'], ['Supine Leg Raise on Flat Bench', 'elevación de piernas en decúbito supino sobre banco plano'],
+    ['Bodyweight Russian Twist', 'giro ruso con peso corporal'], ['Forearm Plank', 'plancha de antebrazos'],
+    ['Concentration Curl', 'curl de concentración'], ['Bench Push-Up', 'flexión con manos apoyadas en banco'], ['Hammer Curl', 'curl de martillo'],
+    ['Standing Rope Triceps Extension', 'extensión de tríceps con cuerda de pie'], ['Alternating Dumbbell Biceps Curl', 'curl alterno de bíceps'],
+    ['Seated Overhead Dumbbell Triceps Extension', 'extensión de tríceps por encima de la cabeza sentado'], ['Mountain Climber', 'escalador de montaña'],
+    ['Leg Lever', 'palanca de pierna'], ['Treadmill', 'caminadora'], ['Sumo Squat', 'sentadilla sumo'], ['Barbell Hip Thrust', 'empuje de cadera con barra'],
+    ['Heels-Elevated Goblet Squat', 'sentadilla goblet con talones elevados'], ['Kettlebell Glute Bridge', 'puente de glúteos con pesa rusa'],
+    ['Dumbbell Step-Up', 'subida al escalón con mancuernas'], ['Shoulders-Elevated Single-Leg Hip Bridge', 'puente a una pierna con hombros elevados'],
+    ['Seated Knee Extension', 'extensión de rodilla sentado en máquina'], ['Wall Sit', 'sentadilla isométrica contra la pared'], ['Seated Leg Press', 'prensa de piernas sentado'],
+    ['Bodyweight Deficit Hip Thrust', 'empuje de cadera desde déficit con peso corporal'], ['Single-Leg Glute Bridge', 'puente de glúteos a una pierna'],
+    ['Rear-Foot-Elevated Split Squat', 'sentadilla dividida con el pie trasero elevado'], ['Banded Seated Hip Abduction', 'abducción de cadera sentado con banda'],
+    ['Reverse Lunge', 'zancada inversa'], ['Single-Leg Eccentric Squat', 'sentadilla excéntrica a una pierna'], ['Glute Bridge', 'puente de glúteos'],
+    ['Box Step-Up', 'subida a un escalón'], ['Jump Squat', 'sentadilla con salto'], ['Seated Leg Extension with Mini Band', 'extensión de rodilla sentado con minibanda'],
+    ['Single-Leg Box Hamstring Curl', 'flexión de isquiotibiales a una pierna con caja'], ['Mini Band Deadlift', 'peso muerto con minibanda'],
+    ['Banded Glute Bridge Hip Abduction', 'puente de glúteos con abducción y banda'], ['Walking Lunge', 'zancada caminando'],
+    ['Mini-Banded Biceps Curl', 'curl de bíceps con minibanda'], ['Mini-Band Overhead Triceps Extension', 'extensión de tríceps sobre la cabeza con banda'],
+    ['Bench Dip', 'fondos de tríceps en banco'], ['Knee Push-Up', 'flexión con apoyo en rodillas'], ['Plank Walkout', 'caminata de manos desde plancha'],
+    ['Banded Pull-Apart', 'apertura de banda'], ['Jumping Jacks', 'saltos de tijera'], ['Knee Slide Crunch', 'abdominal deslizando la rodilla'],
+    ['Supine Toe Touch', 'toque de puntas de los pies acostado'], ['Frog Crunch', 'abdominal de rana'],
+  ];
+  const PENDING = ['5 Way Hips', 'Shinbox Switch', 'Anterior Pathway Stretch', 'Box Shoulder Stretch', 'Leg Lever', 'Single-Leg Box Hamstring Curl', 'Mini Band Deadlift', 'Knee Slide Crunch'];
+
+  it('cada ejercicio tiene ficha con gráfico; inglés y español abren la misma', async () => {
+    const { ANIMS } = await import('./poses');
+    for (const [en, es] of LIST) {
+      const a = findLib(en);
+      const b = findLib(es);
+      expect(a, en).toBeTruthy();
+      expect(b?.key, `${es} → ${a?.key}`).toBe(a!.key);
+      expect(ANIMS[a!.pose], `gráfico de ${en}`).toBeTruthy();
+      if (PENDING.includes(en)) {
+        expect(a!.pending, en).toBeTruthy();
+        expect(a!.steps).toEqual([]);
+        expect(ANIMS[a!.pose].pending).toBe(true);
+      } else {
+        expect(a!.pending, en).toBeFalsy();
+        expect(a!.start.length, `posición inicial de ${en}`).toBeGreaterThan(5);
+        expect(a!.steps.length, `ejecución de ${en}`).toBeGreaterThan(0);
+        expect(ANIMS[a!.pose].pending, `${en} no usa el dibujo neutral`).toBeFalsy();
+        expect(ANIMS[a!.pose].arrows.length + (ANIMS[a!.pose].frames.length > 1 ? 1 : 0), `${en} con flechas`).toBeGreaterThan(0);
+      }
+    }
+  });
+
+  it('la sincronización actualiza el gráfico sin tocar series, repeticiones ni tiempos', async () => {
+    const { syncExercise, newExercise } = await import('./model');
+    const old = newExercise({ name: 'Leg Lever', libKey: 'palanca-pierna', mode: 'reps', reps: 20, perSide: 'a cada lado', steps: ['paso inventado'], pose: 'palanca', restAfter: 0 });
+    const s = syncExercise(old);
+    expect(s).toMatchObject({ name: 'Leg Lever', reps: 20, perSide: 'a cada lado', restAfter: 0, pose: 'pendiente', steps: [] });
+    expect(s.review).toMatch(/Descripción por confirmar/);
+    const wall = syncExercise(newExercise({ name: 'Wall Sit', libKey: 'sentarse-pared', seconds: 50, review: 'Falta algo.' }));
+    expect(wall).toMatchObject({ seconds: 50, pose: 'pared', review: 'Falta algo.' });
+    expect(wall.start).toMatch(/pared/);
+    // lo editado a mano se respeta
+    const mine = syncExercise(newExercise({ name: 'Leg Lever', libKey: 'palanca-pierna', custom: true, steps: ['mi versión'] }));
+    expect(mine.steps).toEqual(['mi versión']);
+  });
+
+  it('la ficha editada por el entrenador se aplica a todos los nombres equivalentes', async () => {
+    const { applyExerciseContent } = await import('./actions');
+    const { withSeeds } = await import('./seed');
+    const { syncLibrary, contentFields } = await import('./model');
+    const s0 = syncLibrary(withSeeds(defaultState()));
+    const content = { ...contentFields({ pose: 'palanca', start: 'Boca arriba.', steps: ['Eleva ambas piernas juntas.'] }) } as never;
+    const s1 = applyExerciseContent(s0, 'palanca-pierna', content, { confirm: true });
+    const levers = s1.routines.flatMap((r) => r.blocks.flatMap((b) => b.exercises)).filter((e) => e.libKey === 'palanca-pierna');
+    expect(levers.length).toBeGreaterThan(2);
+    expect(levers.every((e) => e.steps[0] === 'Eleva ambas piernas juntas.' && !e.review && e.pose === 'palanca')).toBe(true);
+    expect(s1.exerciseLib?.['palanca-pierna']).toBeTruthy();
   });
 });
