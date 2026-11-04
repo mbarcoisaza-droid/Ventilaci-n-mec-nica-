@@ -211,11 +211,14 @@ export function ExerciseInfo({ ex, lowImpact, hideSteps }: { ex: Exercise; lowIm
         <>
           <h4>Cómo se hace</h4>
           {ex.steps.length ? (
-            <ol className="steps">
-              {ex.steps.map((s, i) => (
-                <li key={i}>{s}</li>
-              ))}
-            </ol>
+            <>
+              <ol className="steps">
+                {ex.steps.map((s, i) => (
+                  <li key={i}>{s}</li>
+                ))}
+              </ol>
+              {ex.libKey && <p className="tiny muted">Descripción general de la biblioteca de la app; tu entrenador puede ajustarla.</p>}
+            </>
           ) : (
             <p className="muted">Instrucciones pendientes: el entrenador debe describir este movimiento. Puedes añadirlas en «Editar».</p>
           )}

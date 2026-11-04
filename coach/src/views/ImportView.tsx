@@ -1,13 +1,15 @@
 /** Pegar o importar instrucciones en texto y revisar la rutina resultante. */
 import { useMemo, useState } from 'react';
 import { BLOCK_ICON, Routine, SAMPLE_TEXT } from '../model';
-import { importText } from '../importer';
+import { importMany } from '../importer';
 import { fmtDur } from '../dates';
-import { estimateSeconds, paramText } from '../sequence';
+import { amountText, estimateSeconds, paramText } from '../sequence';
 
-export function ImportView({ onCancel, onCreate }: { onCancel: () => void; onCreate: (r: Routine, edit: boolean) => void }) {
+export function ImportView({ onCancel, onCreate, onCreateMany }: { onCancel: () => void; onCreate: (r: Routine, edit: boolean) => void; onCreateMany: (r: Routine[]) => void }) {
   const [text, setText] = useState('');
-  const res = useMemo(() => (text.trim() ? importText(text) : null), [text]);
+  const many = useMemo(() => (text.trim() ? importMany(text) : null), [text]);
+  const [pick, setPick] = useState(0);
+  const res = many?.results[Math.min(pick, many.results.length - 1)] ?? null;
 
   const loadFile = (f: File) => {
     const reader = new FileReader();
@@ -45,9 +47,28 @@ export function ImportView({ onCancel, onCreate }: { onCancel: () => void; onCre
         </div>
       </section>
 
+      {many && many.results.length > 1 && (
+        <section className="card">
+          <h2>{many.results.length} rutinas encontradas</h2>
+          {many.duplicates.length > 0 && <p className="tiny muted">Repetidas en el texto (se importan una vez): {many.duplicates.join(', ')}.</p>}
+          {many.ignored.length > 0 && <p className="tiny muted">Se ignoraron {many.ignored.length} mensaje(s) que no son instrucciones (p. ej. avisos de sesiones no realizadas).</p>}
+          <div className="chips">
+            {many.results.map((r, i) => (
+              <button key={i} className={`btn sm ${i === pick ? 'on' : 'ghost'}`} onClick={() => setPick(i)}>
+                {r.routine.name}
+                {r.routine.place ? ` · ${r.routine.place}` : ''}
+              </button>
+            ))}
+          </div>
+          <button className="btn primary wide" onClick={() => onCreateMany(many.results.map((r) => r.routine))}>
+            Guardar las {many.results.length} rutinas
+          </button>
+        </section>
+      )}
+      {many && many.results.length === 0 && <p className="notice warn">No se encontraron bloques ni ejercicios. Revisa el formato o crea la rutina manualmente.</p>}
       {res && (
         <section className="card">
-          <h2>Vista previa</h2>
+          <h2>Vista previa{many && many.results.length > 1 ? `: ${res.routine.name}` : ''}</h2>
           <p>
             <b>{res.routine.name}</b>
             {res.routine.place && ` · ${res.routine.place}`} · {fmtDur(estimateSeconds(res.routine))}
@@ -68,7 +89,7 @@ export function ImportView({ onCancel, onCreate }: { onCancel: () => void; onCre
               <ul>
                 {b.exercises.map((e) => (
                   <li key={e.id} className={e.review || e.params.some((p) => p.pending) ? 'flag' : ''}>
-                    <b>{e.name}</b> — {e.mode === 'tiempo' ? (e.seconds ? fmtDur(e.seconds) : '¿duración?') : `${e.reps} reps`}
+                    <b>{e.name}</b> — {amountText(e)}
                     {e.params.map((p) => (
                       <span key={p.id} className={`chip ${p.pending ? 'warn' : ''}`}>
                         {p.label}: {paramText(p)}
@@ -94,10 +115,10 @@ export function ImportView({ onCancel, onCreate }: { onCancel: () => void; onCre
           {res.routine.blocks.length > 0 && (
             <div className="row2">
               <button className="btn primary" onClick={() => onCreate(res.routine, true)}>
-                Revisar y editar
+                Revisar y editar{many && many.results.length > 1 ? ' esta' : ''}
               </button>
               <button className="btn" onClick={() => onCreate(res.routine, false)}>
-                Guardar así
+                Guardar {many && many.results.length > 1 ? 'solo esta' : 'así'}
               </button>
             </div>
           )}

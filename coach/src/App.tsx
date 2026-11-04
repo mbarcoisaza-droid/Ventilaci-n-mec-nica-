@@ -148,6 +148,11 @@ export default function App() {
           if (edit) setOverlay({ kind: 'editar', routine: r, isNew: true });
           else saveRoutine(r);
         }}
+        onCreateMany={(rs) => {
+          update((s) => rs.reduce((acc, r) => upsertRoutine(acc, r), s));
+          setOverlay(null);
+          setTab('rutinas');
+        }}
       />
     );
   } else if (overlay?.kind === 'detalle') {
@@ -267,8 +272,8 @@ function Welcome({ onClose }: { onClose: () => void }) {
         <li>Revisa tu semana, reprograma sesiones y sigue tu progreso.</li>
       </ul>
       <p className="muted tiny">
-        Cargamos la rutina de ejemplo «Cardio y abdomen» y un plan de lunes, miércoles y viernes. Algunos datos aparecen como «por confirmar» a propósito: la app no inventa valores que tu
-        entrenador no haya definido.
+        Cargamos tus rutinas del entrenador, la rutina «Cardio y abdomen» y un plan de lunes, miércoles y viernes que puedes cambiar en Ajustes. Algunos datos aparecen como «por
+        confirmar» a propósito: la app no inventa valores que tu entrenador no haya definido.
       </p>
       <button className="btn big primary" onClick={onClose}>
         Empezar

@@ -428,3 +428,4 @@ details.card summary { font-weight: 700; cursor: pointer; min-height: 32px; }
 @media (prefers-reduced-motion: reduce) {
   * { animation: none !important; transition: none !important; }
 }
+.prop { fill: var(--surface-2); stroke: var(--muted); stroke-width: 1.2; }

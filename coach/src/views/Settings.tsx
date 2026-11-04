@@ -6,6 +6,7 @@ import { DOW_SHORT, WEEK_ORDER, todayISO } from '../dates';
 import { AppState, EQUIPMENT, Level, defaultState, ensurePlanSessions, migrate, sampleRoutine } from '../model';
 import { isIOS, isStandalone, notifPermission, notifSupported, requestNotif } from '../notify';
 import { buildICS, download } from '../progress';
+import { withSeeds } from '../seed';
 
 type Upd = (fn: (s: AppState) => AppState) => void;
 
@@ -32,7 +33,7 @@ export function Settings({ state, update, replace }: { state: AppState; update: 
     const reader = new FileReader();
     reader.onload = () => {
       try {
-        const data = migrate(JSON.parse(String(reader.result)));
+        const data = withSeeds(migrate(JSON.parse(String(reader.result))));
         replace(data);
         setMsg('Copia restaurada correctamente.');
       } catch {
@@ -230,12 +231,12 @@ export function Settings({ state, update, replace }: { state: AppState; update: 
       )}
       {reset && (
         <Sheet title="Borrar todos los datos" onClose={() => setReset(false)}>
-          <p>Se eliminarán rutinas, calendario e historial de este dispositivo y se cargará la rutina de ejemplo. Esta acción no se puede deshacer.</p>
+          <p>Se eliminarán rutinas, calendario e historial de este dispositivo y se cargarán de nuevo las rutinas iniciales. Esta acción no se puede deshacer.</p>
           <div className="row2">
             <button
               className="btn danger"
               onClick={() => {
-                replace({ ...defaultState(), onboarded: true });
+                replace(withSeeds({ ...defaultState(), onboarded: true }));
                 setReset(false);
                 setMsg('Datos borrados.');
               }}

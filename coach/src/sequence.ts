@@ -1,4 +1,5 @@
 /** Convierte una rutina en la secuencia de pasos del modo entrenamiento. */
+import { fmtDur } from './dates';
 import { Block, Exercise, Routine } from './model';
 
 export interface Step {
@@ -20,6 +21,15 @@ export const SEC_PER_REP = 3;
 export function displayName(ex: Exercise, lowImpact: boolean) {
   return lowImpact && ex.lowImpact?.name ? ex.lowImpact.name : ex.name;
 }
+
+/** «12–15 repeticiones por pierna», «30 pasos», «30 s», «20 min». */
+export function amountText(ex: Exercise) {
+  const side = ex.perSide ? ` ${ex.perSide}` : '';
+  if (ex.mode === 'tiempo') return ex.seconds ? `${fmtDur(ex.seconds)}${side}` : 'Duración sin definir';
+  if (!ex.reps) return 'Repeticiones sin definir';
+  return `${repsNumber(ex)} ${ex.repUnit || 'repeticiones'}${side}`;
+}
+export const repsNumber = (ex: Exercise) => `${ex.reps ?? '?'}${ex.repsMax ? `–${ex.repsMax}` : ''}`;
 
 export function buildSteps(r: Routine): Step[] {
   const out: Step[] = [];
@@ -45,7 +55,7 @@ export function buildSteps(r: Routine): Step[] {
 
 export function stepSeconds(st: Step) {
   if (st.seconds != null) return st.seconds;
-  if (st.reps != null) return st.reps * SEC_PER_REP;
+  if (st.reps != null) return st.reps * SEC_PER_REP * (st.exercise.perSide ? 2 : 1);
   return 0;
 }
 

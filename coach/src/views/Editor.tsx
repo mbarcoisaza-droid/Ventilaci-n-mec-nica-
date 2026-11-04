@@ -7,7 +7,7 @@ import { fmtDur } from '../dates';
 import { LIBRARY } from '../library';
 import { BLOCK_ICON, BLOCK_LABEL, Block, BlockKind, Exercise, Param, Routine, fromLib, newBlock, newExercise, newParam } from '../model';
 import { POSE_OPTIONS } from '../poses';
-import { estimateSeconds, paramText } from '../sequence';
+import { amountText, estimateSeconds, paramText } from '../sequence';
 import { parseYouTubeId } from '../youtube';
 
 function move<T>(arr: T[], i: number, d: number): T[] {
@@ -109,7 +109,7 @@ export function RoutineEditor({ initial, focusExercise, onSave, onCancel, isNew 
                   <span className="ex-txt">
                     <b>{e.name}</b>
                     <small>
-                      {e.mode === 'tiempo' ? (e.seconds ? fmtDur(e.seconds) : 'sin duración') : `${e.reps ?? '?'} reps`}
+                      {amountText(e)}
                       {e.params.map((p) => ` · ${p.label}: ${paramText(p)}`).join('')}
                     </small>
                     {(e.review || e.params.some((p) => p.pending)) && <small className="warn-txt">⚠ Por confirmar</small>}
@@ -252,6 +252,19 @@ function ExerciseEditor({ ex, onChange, onDelete, onClose }: { ex: Exercise; onC
           <Stepper label="Repeticiones" value={ex.reps ?? 0} min={1} onChange={(n) => set({ reps: n })} />
         </Field>
       )}
+      {ex.mode === 'reps' && (
+        <div className="grid2">
+          <Field label="Hasta (rango, opcional)" hint="Ej.: 12 a 15 repeticiones.">
+            <input inputMode="numeric" value={ex.repsMax ?? ''} placeholder="—" onChange={(e) => set({ repsMax: Number(e.target.value.replace(/\D/g, '')) || null })} aria-label="Máximo de repeticiones" />
+          </Field>
+          <Field label="Unidad">
+            <input value={ex.repUnit} placeholder="repeticiones" onChange={(e) => set({ repUnit: e.target.value })} />
+          </Field>
+        </div>
+      )}
+      <Field label="Por lado (opcional)" hint="Ej.: por pierna, a cada lado, por brazo.">
+        <input value={ex.perSide} placeholder="—" onChange={(e) => set({ perSide: e.target.value })} />
+      </Field>
       <Field label="Descanso después de este ejercicio" hint="Vacío = el del bloque.">
         <div className="row">
           <input

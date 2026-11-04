@@ -7,7 +7,7 @@ import { Sheet } from '../components/ui';
 import { fmtClock, fmtDur, todayISO } from '../dates';
 import { AppState, BLOCK_ICON, Discomfort, ExerciseLog, HistoryEntry, uid } from '../model';
 import { tone, unlockAudio, vibrate } from '../notify';
-import { Step, buildSteps, displayName, estimateSeconds, paramText, stepSeconds } from '../sequence';
+import { Step, amountText, buildSteps, displayName, estimateSeconds, paramText, repsNumber, stepSeconds } from '../sequence';
 
 type Status = 'listo' | 'corriendo' | 'pausado';
 
@@ -242,7 +242,7 @@ export function Workout({ state, update, onClose }: Props) {
         <div className="wo-title">
           <b>{routine.name}</b>
           <span>
-            {BLOCK_ICON[step.block.kind]} {step.block.title} · Ronda {step.round} de {step.rounds}
+            {BLOCK_ICON[step.block.kind]} {step.block.title} · {step.block.kind === 'fuerza' ? 'Serie' : 'Ronda'} {step.round} de {step.rounds}
           </span>
         </div>
         <span className="wo-count">
@@ -267,7 +267,7 @@ export function Workout({ state, update, onClose }: Props) {
                   <span className="muted">Sigue</span>
                   <b>{displayName(nextWork.exercise, lowImpact)}</b>
                   <span className="muted">
-                    {nextWork.seconds != null ? fmtDur(nextWork.seconds) : nextWork.reps != null ? `${nextWork.reps} repeticiones` : ''}
+                    {amountText(nextWork.exercise)}
                     {nextWork.round !== step.round ? ` · Ronda ${nextWork.round}` : ''}
                   </span>
                 </div>
@@ -299,14 +299,18 @@ export function Workout({ state, update, onClose }: Props) {
           <div className="timer-txt">
             {step.reps != null && !isRest ? (
               <>
-                <b>{step.reps}</b>
-                <span>repeticiones</span>
+                <b>{repsNumber(ex)}</b>
+                <span>
+                  {ex.repUnit || 'repeticiones'}
+                  {ex.perSide ? ` ${ex.perSide}` : ''}
+                </span>
                 <small>{fmtClock(shown / 1000)}</small>
               </>
             ) : (
               <>
                 <b>{fmtClock(shown / 1000)}</b>
                 <span>{isRest ? 'descanso' : status === 'listo' ? 'listo' : status === 'pausado' ? 'en pausa' : 'en curso'}</span>
+                {!isRest && ex.perSide && <small>{ex.perSide}</small>}
               </>
             )}
           </div>

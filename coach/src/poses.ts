@@ -16,9 +16,11 @@ export interface Anim {
   /** Momentos del ciclo para la secuencia de cuadros. */
   frames: { t: number; label: string }[];
   /** Elementos de fondo. */
-  prop?: 'caminadora' | 'colchoneta';
+  prop?: 'caminadora' | 'colchoneta' | 'banco' | 'caja' | 'pared';
   /** Ilustración genérica: el movimiento no está definido. */
   generic?: boolean;
+  /** Ejercicio conocido sin dibujo propio. */
+  noDrawing?: boolean;
 }
 
 const lerp = (a: Pt, b: Pt, k: number): Pt => [a[0] + (b[0] - a[0]) * k, a[1] + (b[1] - a[1]) * k];
@@ -261,8 +263,148 @@ export const ANIMS: Record<string, Anim> = {
   },
 };
 
+const ANIMS_EXTRA: Record<string, Anim> = {};
+
+// De pie de perfil con los brazos colgando (mirando a la derecha)
+const SIDE_ARMS_DOWN: Pose = { ...SIDE_STAND, eL: [60, 36], hL: [61, 48], eR: [59, 36], hR: [60, 48] };
+const SQUAT: Pose = {
+  head: [58, 30], neck: [56, 39], hip: [46, 60],
+  eL: [64, 46], hL: [74, 44], eR: [63, 47], hR: [73, 45],
+  kL: [64, 62], fL: [58, 81], kR: [63, 63], fR: [57, 81],
+};
+const BENT: Pose = {
+  head: [32, 34], neck: [40, 38], hip: [66, 46],
+  eL: [41, 50], hL: [42, 62], eR: [40, 50], hR: [41, 62],
+  kL: [62, 64], fL: [64, 81], kR: [61, 64], fR: [63, 81],
+};
+const BRIDGE_DOWN: Pose = {
+  head: [18, 75], neck: [27, 77], hip: [58, 78],
+  eL: [38, 79], hL: [48, 79], eR: [37, 79], hR: [47, 79],
+  kL: [74, 62], fL: [84, 79], kR: [73, 63], fR: [83, 79],
+};
+const BRIDGE_UP: Pose = { ...BRIDGE_DOWN, hip: [58, 62], kL: [76, 58], kR: [75, 59] };
+const SEATED: Pose = {
+  head: [52, 22], neck: [52, 32], hip: [52, 58],
+  eL: [56, 20], hL: [58, 6], eR: [55, 21], hR: [57, 7],
+  kL: [72, 58], fL: [72, 80], kR: [71, 59], fR: [71, 80],
+};
+
+Object.assign(ANIMS_EXTRA, {
+  sentadilla: { label: 'Sentadilla', at: between(SIDE_ARMS_DOWN, SQUAT), arrows: ['M30 30 L30 56'], frames: STD_FRAMES },
+  zancada: {
+    label: 'Zancada',
+    at: between(SIDE_ARMS_DOWN, { ...SIDE_ARMS_DOWN, head: [56, 27], neck: [56, 37], hip: [56, 60], eL: [57, 49], hL: [58, 60], eR: [56, 49], hR: [57, 60], kL: [70, 62], fL: [72, 81], kR: [46, 78], fR: [34, 80] }),
+    arrows: ['M92 34 L92 56'],
+    frames: STD_FRAMES,
+  },
+  puente: { label: 'Puente de glúteos', at: between(BRIDGE_DOWN, BRIDGE_UP), arrows: ['M58 50 L58 34'], frames: STD_FRAMES, prop: 'colchoneta' },
+  'empuje-cadera': {
+    label: 'Empuje de cadera',
+    at: between(
+      { ...BRIDGE_DOWN, head: [22, 52], neck: [30, 60], hip: [52, 76], eL: [40, 62], hL: [52, 70], eR: [39, 63], hR: [51, 71], kL: [72, 60], fL: [80, 80], kR: [71, 61], fR: [79, 80] },
+      { ...BRIDGE_DOWN, head: [22, 52], neck: [30, 60], hip: [54, 60], eL: [42, 56], hL: [54, 56], eR: [41, 57], hR: [53, 57], kL: [74, 60], fL: [80, 80], kR: [73, 61], fR: [79, 80] },
+    ),
+    arrows: ['M54 46 L54 30'],
+    frames: STD_FRAMES,
+    prop: 'banco',
+  },
+  curl: {
+    label: 'Curl',
+    at: between(SIDE_ARMS_DOWN, { ...SIDE_ARMS_DOWN, eL: [60, 36], hL: [66, 26] }),
+    arrows: ['M80 46 Q84 34 74 24'],
+    frames: STD_FRAMES,
+  },
+  press: {
+    label: 'Press de hombros',
+    at: between(
+      { ...shift(STAND, 0, 8), eL: [44, 38], hL: [44, 24], eR: [76, 38], hR: [76, 24] },
+      { ...shift(STAND, 0, 8), eL: [50, 18], hL: [54, 4], eR: [70, 18], hR: [66, 4] },
+    ),
+    arrows: ['M30 30 L30 8', 'M90 30 L90 8'],
+    frames: STD_FRAMES,
+  },
+  'elev-lateral': {
+    label: 'Elevación lateral',
+    at: between(STAND, { ...STAND, eL: [46, 26], hL: [34, 24], eR: [74, 26], hR: [86, 24] }),
+    arrows: ['M40 50 Q28 44 28 30', 'M80 50 Q92 44 92 30'],
+    frames: STD_FRAMES,
+  },
+  'elev-frontal': {
+    label: 'Elevación frontal',
+    at: between(SIDE_ARMS_DOWN, { ...SIDE_ARMS_DOWN, eL: [70, 25], hL: [82, 24], eR: [69, 26], hR: [81, 25] }),
+    arrows: ['M72 52 Q90 46 90 30'],
+    frames: STD_FRAMES,
+  },
+  remo: {
+    label: 'Remo',
+    at: between(BENT, { ...BENT, eL: [56, 34], hL: [52, 46], eR: [55, 35], hR: [51, 47] }),
+    arrows: ['M30 66 L30 48'],
+    frames: STD_FRAMES,
+  },
+  jalon: {
+    label: 'Jalón al pecho',
+    at: between(SEATED, { ...SEATED, eL: [62, 44], hL: [58, 30], eR: [61, 45], hR: [57, 31] }),
+    arrows: ['M86 8 L86 34'],
+    frames: STD_FRAMES,
+  },
+  'giro-ruso': {
+    label: 'Giro ruso',
+    at: (t) => {
+      const k = Math.sin(2 * Math.PI * t);
+      const base: Pose = { head: [42, 46], neck: [46, 54], hip: [60, 78], eL: [50 + 4 * k, 64], hL: [56 + 10 * k, 62], eR: [50 + 4 * k, 65], hR: [56 + 10 * k, 63], kL: [76, 62], fL: [90, 78], kR: [75, 63], fR: [89, 79] };
+      return base;
+    },
+    arrows: ['M44 40 L70 40', 'M70 40 L44 40'],
+    frames: [
+      { t: 0, label: 'Centro' },
+      { t: 0.25, label: 'Gira a un lado' },
+      { t: 0.75, label: 'Gira al otro' },
+    ],
+    prop: 'colchoneta',
+  },
+  escalon: {
+    label: 'Subida al escalón',
+    at: between(
+      { ...SIDE_ARMS_DOWN, kL: [70, 58], fL: [74, 66], hip: [58, 48] },
+      { ...shift(SIDE_ARMS_DOWN, 12, -16), kL: [72, 50], fL: [74, 66], kR: [70, 52], fR: [74, 66] },
+    ),
+    arrows: ['M40 60 Q50 30 70 26'],
+    frames: STD_FRAMES,
+    prop: 'caja',
+  },
+  pared: {
+    label: 'Sentarse contra la pared',
+    at: between(
+      { head: [30, 31], neck: [30, 41], hip: [30, 62], eL: [36, 50], hL: [44, 58], eR: [35, 51], hR: [43, 59], kL: [52, 62], fL: [52, 81], kR: [51, 63], fR: [51, 81] },
+      { head: [30, 32], neck: [30, 42], hip: [30, 63], eL: [36, 51], hL: [44, 59], eR: [35, 52], hR: [43, 60], kL: [52, 63], fL: [52, 81], kR: [51, 64], fR: [51, 81] },
+    ),
+    arrows: [],
+    frames: [{ t: 0, label: 'Mantén la posición' }],
+    prop: 'pared',
+  },
+  flexor: {
+    label: 'Flexor de cadera',
+    at: between(
+      { head: [56, 26], neck: [56, 36], hip: [56, 60], eL: [57, 48], hL: [58, 58], eR: [56, 48], hR: [57, 58], kL: [74, 62], fL: [74, 81], kR: [44, 80], fR: [30, 81] },
+      { head: [60, 26], neck: [60, 36], hip: [61, 61], eL: [61, 48], hL: [62, 58], eR: [60, 48], hR: [61, 58], kL: [76, 62], fL: [74, 81], kR: [46, 80], fR: [30, 81] },
+    ),
+    arrows: ['M50 52 L66 52'],
+    frames: STD_FRAMES,
+  },
+  'sin-ilustracion': {
+    label: 'Sin ilustración',
+    at: () => STAND,
+    arrows: [],
+    frames: [{ t: 0, label: 'Sin ilustración' }],
+    generic: true,
+    noDrawing: true,
+  },
+} as Record<string, Anim>);
+
+Object.assign(ANIMS, ANIMS_EXTRA);
+
 export const POSE_OPTIONS = Object.entries(ANIMS)
   .filter(([k]) => k !== 'estiramiento')
-  .map(([k, v]) => ({ key: k, label: k === 'generico' ? 'Genérica (sin movimiento)' : v.label }));
+  .map(([k, v]) => ({ key: k, label: k === 'generico' ? 'Genérica (movimiento por definir)' : v.label }));
 
 export const animFor = (key: string) => ANIMS[key] ?? ANIMS.generico;

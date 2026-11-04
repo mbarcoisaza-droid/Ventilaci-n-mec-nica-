@@ -30,6 +30,9 @@ function Scene({ anim, t, arrows, big }: { anim: Anim; t: number; arrows: boolea
         </marker>
       </defs>
       {anim.prop === 'colchoneta' && <rect x="6" y="81" width="108" height="3" rx="1.5" className="mat" />}
+      {anim.prop === 'banco' && <rect x="8" y="60" width="26" height="22" rx="2" className="prop" />}
+      {anim.prop === 'caja' && <rect x="66" y="66" width="30" height="16" rx="2" className="prop" />}
+      {anim.prop === 'pared' && <rect x="16" y="4" width="8" height="78" className="prop" />}
       {anim.prop === 'caminadora' && (
         <g className="treadmill">
           <path d="M28 84 L96 78 L98 82 L30 88 Z" />
@@ -42,7 +45,7 @@ function Scene({ anim, t, arrows, big }: { anim: Anim; t: number; arrows: boolea
         <Figure p={anim.at(t)} />
       </g>
       {arrows && anim.arrows.map((d, i) => <path key={i} d={d} className="arrow" markerEnd={`url(#a${mid})`} />)}
-      {anim.generic && (
+      {anim.generic && !anim.noDrawing && (
         <text x="92" y="30" className="qmark">
           ?
         </text>
@@ -75,7 +78,13 @@ export function Illustration({ pose, compact, title }: { pose: string; compact?:
     <>
       <div className="scene-wrap">
         <Scene anim={anim} t={t} arrows big={big} />
-        {anim.generic && <p className="scene-note">Ilustración genérica: el entrenador aún no ha definido este movimiento.</p>}
+        {anim.generic && (
+          <p className="scene-note">
+            {anim.noDrawing
+              ? 'No hay ilustración para este ejercicio: sigue las instrucciones o añade un video.'
+              : 'Ilustración genérica: el entrenador aún no ha definido este movimiento.'}
+          </p>
+        )}
       </div>
       {!anim.generic && (
         <ol className="frames" aria-label="Secuencia del movimiento">

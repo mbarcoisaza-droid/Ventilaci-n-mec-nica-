@@ -44,6 +44,12 @@ export interface Exercise {
   mode: 'tiempo' | 'reps';
   seconds: number | null;
   reps: number | null;
+  /** Máximo del rango de repeticiones (12–15); null si es un número fijo. */
+  repsMax: number | null;
+  /** Unidad de las repeticiones si no son «repeticiones» (p. ej. «pasos»). */
+  repUnit: string;
+  /** «por pierna», «a cada lado»… */
+  perSide: string;
   /** Descanso tras este ejercicio (sustituye al del bloque); null = el del bloque. */
   restAfter: number | null;
   params: Param[];
@@ -201,6 +207,8 @@ export interface AppState {
   settings: Settings;
   active: ActiveWorkout | null;
   onboarded: boolean;
+  /** Paquetes de rutinas ya cargados (para no duplicarlos). */
+  seeds: string[];
   updatedAt: string;
 }
 
@@ -217,6 +225,9 @@ export function newExercise(p: Partial<Exercise> = {}): Exercise {
     mode: 'tiempo',
     seconds: 30,
     reps: null,
+    repsMax: null,
+    repUnit: '',
+    perSide: '',
     restAfter: null,
     params: [],
     summary: '',
@@ -370,7 +381,20 @@ export function defaultState(): AppState {
     settings: { theme: 'sistema', sound: true, vibrate: true, autoAdvance: true, weeklyGoal: 3 },
     active: null,
     onboarded: false,
+    seeds: [],
     updatedAt: new Date().toISOString(),
+  };
+}
+
+/** Completa campos de ejercicio añadidos en versiones posteriores. */
+export function normalizeRoutine(r: Routine): Routine {
+  return {
+    ...r,
+    comments: r.comments ?? [],
+    blocks: (r.blocks ?? []).map((b) => ({
+      ...b,
+      exercises: (b.exercises ?? []).map((e) => ({ ...newExercise(), ...e, repsMax: e.repsMax ?? null, repUnit: e.repUnit ?? '', perSide: e.perSide ?? '' })),
+    })),
   };
 }
 
@@ -379,9 +403,12 @@ export function migrate(raw: unknown): AppState {
   const d = defaultState();
   const s = (raw ?? {}) as Partial<AppState>;
   if (!Array.isArray(s.routines)) return d;
+  const routines = (s.routines as Routine[]).map(normalizeRoutine);
   return {
     ...d,
     ...s,
+    routines,
+    seeds: Array.isArray(s.seeds) ? s.seeds : [],
     version: 1,
     sessions: Array.isArray(s.sessions) ? s.sessions : [],
     history: Array.isArray(s.history) ? s.history : [],

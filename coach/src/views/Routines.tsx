@@ -4,9 +4,10 @@ import { deleteRoutine, duplicateRoutine, upsertRoutine } from '../actions';
 import { ExerciseInfo, ExerciseMedia } from '../components/ExerciseMedia';
 import { Thumb } from '../components/Illustration';
 import { Empty, Sheet, Toggle } from '../components/ui';
+import { ExerciseGroups, pendingExerciseCount } from './ExerciseGroups';
 import { fmtDur, fmtShort, todayISO } from '../dates';
 import { AppState, BLOCK_ICON, Exercise, Routine, uid } from '../model';
-import { displayName, estimateSeconds, findIssues, paramText } from '../sequence';
+import { amountText, displayName, estimateSeconds, findIssues, paramText } from '../sequence';
 
 type Upd = (fn: (s: AppState) => AppState) => void;
 
@@ -28,6 +29,8 @@ export function RoutineList({
   onSchedule: (routineId: string) => void;
 }) {
   const [confirmDel, setConfirmDel] = useState<Routine | null>(null);
+  const [groups, setGroups] = useState(false);
+  const pendingEx = pendingExerciseCount(state);
   return (
     <div className="page">
       <h1 className="page-title">Rutinas</h1>
@@ -39,6 +42,12 @@ export function RoutineList({
           📋 Pegar o importar texto
         </button>
       </div>
+      {state.routines.length > 0 && (
+        <button className={`notice as-btn ${pendingEx ? 'warn' : ''}`} onClick={() => setGroups(true)}>
+          🧩 {pendingEx ? `${pendingEx} ejercicio(s) por confirmar. Confírmalos o añade videos una sola vez para todas las rutinas.` : 'Ejercicios: añade videos o instrucciones una sola vez para todas las rutinas.'}
+        </button>
+      )}
+      {groups && <ExerciseGroups state={state} update={update} onClose={() => setGroups(false)} />}
       {!state.routines.length && (
         <Empty icon="📝" title="Aún no tienes rutinas">
           <p className="muted">Crea una rutina por bloques o pega las instrucciones de tu entrenador para convertirlas en una rutina estructurada.</p>
@@ -206,7 +215,7 @@ export function RoutineDetail({
                   <span className="ex-txt">
                     <b>{displayName(e, routine.useLowImpact)}</b>
                     <small>
-                      {e.mode === 'tiempo' ? (e.seconds ? fmtDur(e.seconds) : 'Duración sin definir') : e.reps ? `${e.reps} repeticiones` : 'Repeticiones sin definir'}
+                      {amountText(e)}
                       {e.params.map((p) => ` · ${p.label}: ${paramText(p)}`).join('')}
                       {e.videoUrl ? ' · ▶ video' : ''}
                     </small>
