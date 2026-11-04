@@ -3,6 +3,7 @@
  * con instrucciones numeradas, puntos clave y errores frecuentes.
  */
 import { useEffect, useRef, useState } from 'react';
+import { spanishName } from '../library';
 import { Exercise } from '../model';
 import { paramText } from '../sequence';
 import { embedUrl, parseYouTubeId, parseYouTubeStart } from '../youtube';
@@ -194,6 +195,7 @@ export function ExerciseInfo({ ex, lowImpact, hideSteps }: { ex: Exercise; lowIm
           {ex.lowImpact.note ? ` · ${ex.lowImpact.note}` : ''}
         </p>
       )}
+      {spanishName(ex) && <p className="tiny muted">En español: {spanishName(ex)}</p>}
       {ex.review && <p className="notice warn">⚠ {ex.review}</p>}
       {ex.summary && <p className="summary">{ex.summary}</p>}
       {ex.params.length > 0 && (

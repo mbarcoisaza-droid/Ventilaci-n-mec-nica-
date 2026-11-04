@@ -1,41 +1,200 @@
 /**
- * Rutinas del entrenador tal como se recibieron (texto original, sin los avisos de sesiones no realizadas).
- * La app las convierte con el importador; lo que no está claro queda marcado para confirmar.
+ * Rutinas del entrenador con los nombres de los ejercicios en inglés, tal como los usa el entrenador
+ * (texto original, sin los avisos de sesiones no realizadas). La app las convierte con el importador;
+ * lo que no está claro queda marcado para confirmar.
+ * «brazos y abdomen gym» no venía en la versión en inglés: sus nombres se tradujeron cuando tienen
+ * un equivalente claro; «Flexiones en banco» se deja en español porque es ambiguo.
  */
-export const TRAINER_SEED_ID = 'entrenador-2024';
+export const TRAINER_SEED_ID = 'entrenador-2024-en';
+/** Paquete anterior (nombres en español) que esta versión reemplaza. */
+export const OLD_SEED_IDS = ['entrenador-2024'];
 
-export const TRAINER_TEXT = `espalda y hombro y abdomen gimnasio
+export const TRAINER_TEXT = `cuadriceps gym
 
-Calentamiento:
-3 rondas
+Warmup:
+3 rondas en total
 
-0:30 segundos círculo de cadera de pie
-0:30 segundos círculo de brazos
-Saltando 1:00 minuto
+0:30 segundos Half Kneeling Hip Flexor Stretch por pierna
+0:30 segundos deep squat hold
+0:30 segundos 5 way hips
+0:30 segundos Shinbox Switch
 
-A1) Jalón al pecho con agarre inverso
+A) Sumo Squat
 
-2 rondas
+4 rondas
 (calentamiento)
-20 libras
+
+20 repeticiones
+
+1 minuto de descanso entre serie
+
+B1) Seated Knee Extension
 
 4 rondas
 
-30-40 libras
+peso de 30-40 lb
 12-15 repeticiones
 
 de seguido al siguiente ejercicio
 
-A2) Elevación lateral con mancuernas
+B2) Wall Sit
+
+4 rondas
+
+30 segundos
+
+1 minuto de descanso entre serie
+
+C) seated leg press
+
+4 rondas
+
+15 repeticiones
+
+peso de 40-50 lb
+
+de seguido al siguiente ejercicio
+
+D1) Dumbbell Step-Up
+
+4 rondas
+
+8 repeticiones por pierna
+mancuernas 5 lb
+
+de seguido al siguiente ejercicio
+
+D2) Barbell Hip Thrust
+
+4 rondas
+
+12-15 repeticiones
+barra de 30 lb
+
+al final de cada ronda te quedas arriba 10 segundos
+
+1 minuto de descanso entre serie
+
+E) Treadmill
+
+inclinacion maxima
+
+velocidad 4.5/5
+20 min
+
+Cooldown:
+1:00 minuto dynamic straddle stretch
+1:00 minuto seated pike stretch
+0:30 segundos supine figure four glute stretch
+0:30 segundos thomas stretch
+
+pierna/cuadriceps casa
+
+Warmup:
+3 rondas en total
+
+0:30 segundos Half Kneeling Hip Flexor Stretch por pierna
+0:30 segundos deep squat hold
+0:30 segundos 5 way hips
+0:30 segundos Shinbox Switch
+
+A) Single Leg Eccentric Squat
+
+4 rondas
+
+15 repeticiones por pierna
+
+1 minuto de descanso entre serie
+
+B1) Glute Bridge
+
+4 rondas
+
+20 repeticiones
+
+de seguido al siguiente ejercicio
+
+B2) Banded Seated Hip Abduction
+
+4 rondas
+
+20 repeticiones
+banda fuerte
+
+1 minuto de descanso entre serie
+
+C) Box Step-Up
+
+4 rondas
+
+10 repeticiones por pierna
+te subes a cualquier superficie alta
+
+1 minuto de descanso entre serie
+
+D1) Wall Sit
+
+4 rondas
+
+50 segundos
+
+de seguido al siguiente ejercicio
+
+D2) Jump Squat
+
+4 rondas
+
+10-12 repeticiones
+
+1 minuto de descanso entre serie
+
+E) Seated Leg Extension With MiniBand
+
+4 rondas
+
+20 repeticiones por pierna
+banda fuerte
+
+1 minuto de descanso entre serie
+
+Cooldown:
+1:00 minuto dynamic straddle stretch
+1:00 minuto seated pike stretch
+0:30 segundos supine figure four glute stretch
+0:30 segundos thomas stretch
+
+espalda y hombro y abdomen gym
+
+Warmup:
+3 rondas
+
+0:30 segundos standing hip circle
+0:30 segundos arm circle
+1:00 minuto skipping
+
+A1) Reverse Grip Lat Pulldown
+
+2 rondas
+(calentamiento)
+20 lb
+
+4 rondas
+
+30-40 lb
+12-15 repeticiones
+
+de seguido al siguiente ejercicio
+
+A2) Dumbbell Lateral Raise
 
 4 rondas
 
 mancuernas 5 lb
 10 repeticiones
 
-1 minuto de descanso entre series
+1 minuto de descanso entre serie
 
-B1) Remo con mancuernas inclinado hacia adelante y en posición supina
+B1) Bent Over Supinated Dumbbell Row
 
 4 rondas
 
@@ -44,16 +203,16 @@ mancuernas de 10 lb
 
 de seguido al siguiente ejercicio
 
-B2) Elevación frontal con mancuernas
+B2) Dumbbell Frontal Raise
 
 4 rondas
 
 mancuernas 5 lb
 12-15 repeticiones
 
-1 minuto de descanso entre series
+1 minuto de descanso entre serie
 
-C1) Remo con mancuernas con apoyo en el pecho
+C1) Chest Supported Dumbbell Row
 
 4 rondas
 
@@ -62,32 +221,32 @@ mancuerna 5 lb
 
 de seguido al siguiente ejercicio
 
-C2) Press de hombros con mancuernas con apoyo en la espalda
+C2) Back Supported Dumbbell Shoulder Press
 
 4 rondas
 
 mancuernas 10 lb
 8-10 repeticiones
 
-1 minuto de descanso entre series
+1 minuto de descanso entre serie
 
-D1) V Arriba
+D1) V Up's
 
 4 rondas
 
 6-8 repeticiones
 
-1 minuto de descanso entre series
+1 minuto de descanso entre serie
 
-D2) Elevación de piernas en decúbito supino sobre banco plano
+D2) Supine Leg Raise on Flat Bench
 
 4 rondas
 
 10 repeticiones
 
-1 minuto de descanso entre series
+1 minuto de descanso entre serie
 
-E1) Giro ruso con peso corporal
+E1) Bodyweight Russian Twist
 
 4 rondas
 
@@ -95,7 +254,7 @@ E1) Giro ruso con peso corporal
 
 de seguido al siguiente ejercicio
 
-E2) Plancha con antebrazos
+E2) Forearm Plank
 
 4 rondas
 
@@ -103,30 +262,30 @@ E2) Plancha con antebrazos
 
 1 minuto de descanso
 
-F) caminadora
+F) Treadmill
 
 20 minutos
 
-inclinación máxima
+inclinacion maxima
 velocidad 3/3.5
 
-Enfriarse:
-1:00 minuto estiramiento de la vía anterior
-1:00 minuto estiramiento de hombros en caja
-0:20 segundos estiramiento de cobra
+Cooldown:
+1:00 minuto anterior pathway stretch
+1:00 minuto box shoulder stretch
+0:20 segundos cobra stretch
 
-gimnasio de brazos y abdomen
+brazos y abdomen gym
 
-Calentamiento:
-primero 5 minutos en la caminadora
+Warmup:
+primero 5 minutos de Treadmill
 
 3 rondas
 
-0:30 segundos círculo de cadera de pie
-0:30 segundos círculo de brazos
-Saltando 1:00 minuto
+0:30 segundos standing hip circle
+0:30 segundos arm circle
+1:00 minuto skipping
 
-A1) Curl de concentración
+A1) Concentration Curl
 
 4 rondas
 
@@ -143,7 +302,7 @@ A2) Flexiones en banco
 
 descansas 1 minuto y repites
 
-B1) Curl de martillo
+B1) Hammer Curl
 
 4 rondas
 
@@ -152,7 +311,7 @@ mancuerna 5 lb
 
 sin descanso pasas al siguiente ejercicio
 
-B2) Extensión de tríceps con cuerda de pie
+B2) Standing Rope Tricep Extension
 
 4 rondas
 
@@ -161,7 +320,7 @@ peso de 15-20 lb
 
 descansas 1 minuto y repites
 
-C1) Curl de bíceps alterno
+C1) Alternating Bicep Curl
 
 4 rondas
 
@@ -170,7 +329,7 @@ mancuernas 5 lb
 
 de seguido al siguiente ejercicio
 
-C2) Extensión de tríceps con mancuernas por encima de la cabeza sentado
+C2) Seated Dumbbell Overhead Tricep Extension
 
 4 rondas
 
@@ -179,53 +338,178 @@ mancuerna 10 lb
 
 descansas 1 minuto y repites
 
-D1) Escalador de montaña
+D1) Mountain Climber
 
 4 rondas
 
 20 repeticiones a cada lado
 
-de segiodo al siguiente ejercicio
+de seguido al siguiente ejercicio
 
-D2) Palanca de pierna
+D2) Leg Lever
 
 4 rondas
 
 20 repeticiones a cada lado
 
-1 minuto de descanso entre series
+1 minuto de descanso entre serie
 
-E) caminadora
+E) Treadmill
 
 20 minutos
 
-inclinación máxima
+inclinacion maxima
 velocidad 3/3.5
 
-Enfriarse:
-1:00 minuto estiramiento de la vía anterior
-1:00 minuto estiramiento de hombros en caja
-0:20 segundos estiramiento de cobra
+Cooldown:
+1:00 minuto anterior pathway stretch
+1:00 minuto box shoulder stretch
+0:20 segundos cobra stretch
 
-gimnasio de glúteos
+tren superior casa
 
-Calentamiento:
+Warmup:
+3 rondas
+
+0:30 segundos standing hip circle
+0:30 segundos arm circle
+1:00 minuto skipping
+
+A) Plank Shoulder Touch
+
+4 rondas
+
+10-12 repeticiones por brazo
+
+1 minuto de descanso entre serie
+
+B) Hand Release Push-Up
+
+4 rondas
+
+8-10 repeticiones
+
+1 minuto de descanso entre serie
+
+C) Bench Dip
+
+4 rondas
+
+15 repeticiones
+
+de seguido al siguiente ejercicio
+
+D) Seated Row
+
+4 rondas
+
+20 repeticiones
+banda fuerte
+
+1 minuto de descanso entre serie
+
+E) Renegade Row
+
+4 rondas
+
+8-10 repeticiones por brazo
+SIN PESO
+
+1 minuto de descanso entre serie
+
+F) Knee Push-Up
+
+4 rondas
+
+10 repeticiones
+
+1 minuto de descanso entre serie
+
+G) Mountain Climber
+
+4 rondas
+
+banda fuerte
+15 repeticiones por brazo
+
+1 minuto de descanso entre serie
+
+H) Abs
+
+30 segundos por ejercicio
+10 segundos de descanso entre ejercicio
+1 minuto de descanso entre serie
+
+3 series
+
+knee slide crunch
+leg lever
+supine toe touch
+forearm plank
+bodyweight russian twist
+
+Cooldown:
+1:00 minuto anterior pathway stretch
+1:00 minuto box shoulder stretch
+0:20 segundos cobra stretch
+
+cardio y abdomen casa o gym
+
+Warmup:
+3 rondas
+
+0:30 segundos standing hip circle
+0:30 segundos arm circle
+1:00 minuto skipping
+
+A) abdomen
+
+circuito
+
+30 segundos por ejercicio
+10 segundos de descanso entre ejercicio
+1 minuto de descanso entre serie
+
+3 rondas
+
+supine toe touch
+frog crunch
+mountain climber
+leg lever
+v ups
+forearm plank
+
+B) Treadmill
+
+20 minutos
+
+inclinacion max
+velocidad 3.5
+
+Cooldown:
+1:00 minuto anterior pathway stretch
+1:00 minuto box shoulder stretch
+0:20 segundos cobra stretch
+
+gluteo gym
+
+Warmup:
 3 rondas en total
 
-0:30 segundos Estiramiento del flexor de cadera medio arrodillado por pierna
-0:30 segundos de sentadilla profunda
-0:30 segundos 5 vías caderas
+0:30 segundos Half Kneeling Hip Flexor Stretch por pierna
+0:30 segundos deep squat hold
+0:30 segundos 5 way hips
 0:30 segundos Shinbox Switch
 
-A) Sentadilla sumo
+A) Sumo Squat
 
 4 rondas
 (calentamiento)
 20 repeticiones
 
-1 minuto de descanso entre series
+1 minuto de descanso entre serie
 
-B) Empuje de cadera con barra
+B) Barbell Hip Thrust
 
 4 rondas
 
@@ -235,27 +519,27 @@ barra de 30 lb
 
 pausa de 10 segundos arriba al final de cada ronda
 
-1 minuto de descanso entre series
+1 minuto de descanso entre serie
 
-C) Sentadilla con pesa y talones elevados
+C) Heels elevated Goblet Squat
 
 4 rondas
 
 mancuerna 10 lb
 12-15 repeticiones
 
-1 minuto de descanso entre series
+1 minuto de descanso entre serie
 
-D1) Puente de glúteos con pesa rusa
+D1) Kettlebell Glute Bridge
 
 4 rondas
 
-mancuernas de 20 a 30 libras
+mancuernas 20-30 lb
 20 repeticiones
 
 de seguido al siguiente ejercicio
 
-D2) Subida al escalón con mancuernas
+D2) Dumbbell Step-Up
 
 4 rondas
 
@@ -264,7 +548,7 @@ mancuernas 5 lb
 
 descanso 1 minuto entre serie
 
-E) Elevación de hombros, puente de cadera con una sola pierna
+E) Shoulders Elevated Single Leg Hip Bridge
 
 4 rondas
 
@@ -275,300 +559,232 @@ mancuerna de 10 lb
 
 descanso de 1 minuto entre serie
 
-F) caminadora
+F) Treadmill
 
-elevación máxima
+elevacion maxima
 
 velocidad 4.5/5
 30 minutos
 
-Enfriarse:
-1:00 minuto estiramiento dinámico de piernas separadas
-1:00 minuto estiramiento de pica sentado
-0:30 segundos estiramiento de glúteos en posición supina en forma de cuatro
-0:30 segundos Thomas Stretch
+Cooldown:
+1:00 minuto dynamic straddle stretch
+1:00 minuto seated pike stretch
+0:30 segundos supine figure four glute stretch
+0:30 segundos thomas stretch
 
 gluteo casa
 
-Calentamiento:
+Warmup:
 3 rondas en total
 
-0:30 segundos Estiramiento del flexor de cadera medio arrodillado por pierna
-0:30 segundos de sentadilla profunda
-0:30 segundos 5 vías caderas
+0:30 segundos Half Kneeling Hip Flexor Stretch por pierna
+0:30 segundos deep squat hold
+0:30 segundos 5 way hips
 0:30 segundos Shinbox Switch
 
-A) Empuje de cadera con déficit de peso corporal
+A) Bodyweight Deficit Hip Thrust
 
 4 rondas
 
 20 repeticiones
 banda en las piernas
 
-1 minuto de descanso entre series
+1 minuto de descanso entre serie
 
-B) Puente de glúteos con una sola pierna
+B) Single Leg Glute Bridge
 
 4 rondas
 
 20 repeticiones
 
-1 minuto de descanso entre series
+1 minuto de descanso entre serie
 
-C) Sentadilla dividida con el pie trasero elevado
+C) Rear Foot Elevated Split Squat
 
 4 rondas
 
 15 repeticiones por pierna
 
-1 minuto de descanso entre series
+1 minuto de descanso entre serie
 
-D) Sentadilla sumo
-
-4 rondas
-
-20 repeticiones
-
-1 minuto de descanso entre series
-
-E) Abducción sentada con bandas
+D) Sumo Squat
 
 4 rondas
 
 20 repeticiones
 
-1 minuto de descanso entre series
+1 minuto de descanso entre serie
 
-F) Zancada inversa
+E) Banded Seated Abduction
+
+4 rondas
+
+20 repeticiones
+
+1 minuto de descanso entre serie
+
+F) Reverse Lunge
 
 4 rondas
 
 10 repeticiones por pierna
 
-1 minuto de descanso entre series
+1 minuto de descanso entre serie
 
-Enfriarse:
-1:00 minuto estiramiento dinámico de piernas separadas
-1:00 minuto estiramiento de pica sentado
-0:30 segundos estiramiento de glúteos en posición supina en forma de cuatro
-0:30 segundos Thomas Stretch
+Cooldown:
+1:00 minuto dynamic straddle stretch
+1:00 minuto seated pike stretch
+0:30 segundos supine figure four glute stretch
+0:30 segundos thomas stretch
 
-casa femoral
+tren superior casa
 
-Calentamiento:
-3 rondas en total
+Warmup:
+3 rondas
 
-0:30 segundos Estiramiento del flexor de cadera medio arrodillado por pierna
-0:30 segundos de sentadilla profunda
-0:30 segundos 5 vías caderas
-0:30 segundos Shinbox Switch
+0:30 segundos standing hip circle
+0:30 segundos arm circle
+1:00 minuto skipping
 
-A) Flexión de isquiotibiales con una sola pierna en caja
-
-4 rondas
-
-20 repeticiones por pierna
-
-1 minuto de descanso entre series
-
-B) Sentadilla sumo
+A) Mini Banded BicepCurl
 
 4 rondas
 
-20 repeticiones
+15 repeticiones por brazo
 
-1 minuto de descanso entre series
+1 minuto de descanso entre serie
 
-C) Puente de glúteos con una sola pierna
-
-4 rondas
-
-20 repeticiones por pierna
-
-1 minuto de descanso entre series
-
-D) Peso muerto con minibanda
+B) Mini band Overhead tricep extension
 
 4 rondas
 
 20 repeticiones
+banda media
 
-1 minuto de descanso entre series
+1 minuto de descanso entre serie
 
-E) Abducción de cadera con puente de glúteos con banda
-
-4 rondas
-
-20 repeticiones
-banda fuerte
-
-1 minuto de descanso entre series
-
-F) Zancada caminando
-
-4 rondas
-
-30 pasos
-
-1 minuto de descanso entre series
-
-Enfriarse:
-1:00 minuto estiramiento dinámico de piernas separadas
-1:00 minuto estiramiento de pica sentado
-0:30 segundos estiramiento de glúteos en posición supina en forma de cuatro
-0:30 segundos Thomas Stretch
-
-gimnasio de cuádriceps
-
-Calentamiento:
-3 rondas en total
-
-0:30 segundos Estiramiento del flexor de cadera medio arrodillado por pierna
-0:30 segundos de sentadilla profunda
-0:30 segundos 5 vías caderas
-0:30 segundos Shinbox Switch
-
-A) Sentadilla sumo
-
-4 rondas
-(calentamiento)
-
-20 repeticiones
-
-1 minuto de descanso entre series
-
-B1) Extensión de rodilla sentado
-
-4 rondas
-
-peso de 30-40 lb
-12-15 repeticiones
-
-de seguido al siguiente ejercicio
-
-B2) Sentarse contra la pared
-
-4 rondas
-
-30 segundos
-
-1 minuto de descanso entre series
-
-C) Prensa de piernas sentado
+C) Bench Dip
 
 4 rondas
 
 15 repeticiones
 
-peso de 40-50 lb
-
 de seguido al siguiente ejercicio
 
-D1) Subida al escalón con mancuernas
+D1) Knee Push-Up
 
 4 rondas
 
-8 repeticiones por pierna
-mancuernas 5 lb
+10 repeticiones
 
 de seguido al siguiente ejercicio
 
-D2) Empuje de cadera con barra
+D2) Plank Walkouts
 
 4 rondas
 
-12-15 repeticiones
-barra de 30 lb
+5 repeticiones
+adelante y atras
 
-al final de cada ronda te quedas arriba 10 segundos
+1 minuto de descanso entre serie
 
-1 minuto de descanso entre series
+E) Banded Pull Apart
 
-E) caminadora
+4 rondas
 
-inclinación máxima
+20 repeticiones
 
-velocidad 4.5/5
-20 minutos
+1 minuto de descanso entre serie
 
-Enfriarse:
-1:00 minuto estiramiento dinámico de piernas separadas
-1:00 minuto estiramiento de pica sentado
-0:30 segundos estiramiento de glúteos en posición supina en forma de cuatro
-0:30 segundos Thomas Stretch
+F) Jumping Jacks
 
-pierna/cuadriceps casa
+4 rondas
 
-Calentamiento:
+30 repeticiones
+
+1 minuto de descanso entre serie
+
+G) Abs
+
+30 segundos por ejercicio
+10 segundos de descanso entre ejercicio
+1 minuto de descanso entre serie
+
+3 series
+
+knee slide crunch
+leg lever
+supine toe touch
+forearm plank
+bodyweight russian twist
+
+Cooldown:
+1:00 minuto anterior pathway stretch
+1:00 minuto box shoulder stretch
+0:20 segundos cobra stretch
+
+femoral casa
+
+Warmup:
 3 rondas en total
 
-0:30 segundos Estiramiento del flexor de cadera medio arrodillado por pierna
-0:30 segundos de sentadilla profunda
-0:30 segundos 5 vías caderas
+0:30 segundos Half Kneeling Hip Flexor Stretch por pierna
+0:30 segundos deep squat hold
+0:30 segundos 5 way hips
 0:30 segundos Shinbox Switch
 
-A) Sentadilla excéntrica a una pierna
-
-4 rondas
-
-15 repeticiones por pierna
-
-1 minuto de descanso entre series
-
-B1) Puente de glúteos
-
-4 rondas
-
-20 repeticiones
-
-de seguido al siguiente ejercicio
-
-B2) Abducción de cadera sentado con banda
-
-4 rondas
-
-20 repeticiones
-banda fuerte
-
-1 minuto de descanso entre series
-
-C) Escalera de caja
-
-4 rondas
-
-10 repeticiones por pierna
-te subes a cualquier superficie alta
-
-1 minuto de descanso entre series
-
-D1) Sentarse contra la pared
-
-4 rondas
-
-50 segundos
-
-de seguido al siguiente ejercicio
-
-D2) Sentadilla con salto
-
-4 rondas
-
-10-12 repeticiones
-
-1 minuto de descanso entre series
-
-E) Extensión de piernas sentado con minibanda
+A) Single Leg Box Hamstring Curl
 
 4 rondas
 
 20 repeticiones por pierna
+
+1 minuto de descanso entre serie
+
+B) Sumo Squat
+
+4 rondas
+
+20 repeticiones
+
+1 minuto de descanso entre serie
+
+C) Single Leg Glute Bridge
+
+4 rondas
+
+20 repeticiones por pierna
+
+1 minuto de descanso entre serie
+
+D) Mini band Deadlift
+
+4 rondas
+
+20 repeticiones
+
+1 minuto de descanso entre serie
+
+E) Banded Glute Bridge Hip Abduction
+
+4 rondas
+
+20 repeticiones
 banda fuerte
 
-1 minuto de descanso entre series
+1 minuto de descanso entre serie
 
-Enfriarse:
-1:00 minuto estiramiento dinámico de piernas separadas
-1:00 minuto estiramiento de pica sentado
-0:30 segundos estiramiento de glúteos en posición supina en forma de cuatro
-0:30 segundos Thomas Stretch
+F) Walking Lunge
+
+4 rondas
+
+30 pasos
+
+1 minuto de descanso entre serie
+
+Cooldown:
+1:00 minuto dynamic straddle stretch
+1:00 minuto seated pike stretch
+0:30 segundos supine figure four glute stretch
+0:30 segundos thomas stretch
 `;

@@ -6,6 +6,7 @@ import { Thumb } from '../components/Illustration';
 import { Sheet } from '../components/ui';
 import { fmtClock, fmtDur, todayISO } from '../dates';
 import { AppState, BLOCK_ICON, Discomfort, ExerciseLog, HistoryEntry, uid } from '../model';
+import { spanishName } from '../library';
 import { tone, unlockAudio, vibrate } from '../notify';
 import { Step, amountText, buildSteps, displayName, estimateSeconds, paramText, repsNumber, stepSeconds } from '../sequence';
 
@@ -277,6 +278,7 @@ export function Workout({ state, update, onClose }: Props) {
         ) : (
           <>
             <h1 className="wo-name">{name}</h1>
+            {spanishName(ex) && name === ex.name && <p className="center muted es-sub">{spanishName(ex)}</p>}
             {lowImpact && ex.lowImpact && <p className="tiny muted center">Variante de bajo impacto · original: {ex.name}</p>}
             {ex.params.length > 0 && (
               <div className="wo-params">

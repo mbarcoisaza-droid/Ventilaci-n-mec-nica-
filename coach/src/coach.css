@@ -429,3 +429,5 @@ details.card summary { font-weight: 700; cursor: pointer; min-height: 32px; }
   * { animation: none !important; transition: none !important; }
 }
 .prop { fill: var(--surface-2); stroke: var(--muted); stroke-width: 1.2; }
+.es-name { font-style: italic; }
+.es-sub { margin: -8px 0 0; font-size: 15px; }

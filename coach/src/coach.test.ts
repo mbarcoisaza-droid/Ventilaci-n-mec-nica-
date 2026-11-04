@@ -187,52 +187,86 @@ describe('Inicio de entrenamiento', () => {
   });
 });
 
-describe('Rutinas del entrenador', () => {
-  it('separa, deduplica e ignora avisos', async () => {
+describe('Rutinas del entrenador (nombres en inglés)', () => {
+  it('reconoce las rutinas en inglés sin líneas perdidas', async () => {
     const { importMany } = await import('./importer');
     const { TRAINER_TEXT } = await import('./data/trainerText');
-    const parts = TRAINER_TEXT.split('\ngimnasio de glúteos');
-    const text = `${parts[0]}\nHola Mayra,\n\nNo hiciste tu entrenamiento programado para el miércoles 3 de abril de 2024.\n\ngimnasio de glúteos${parts[1]}\n\n${TRAINER_TEXT.slice(TRAINER_TEXT.indexOf('gluteo casa'), TRAINER_TEXT.indexOf('casa femoral'))}`;
+    const text = `${TRAINER_TEXT}\n\nHola Mayra,\n\nNo hiciste tu entrenamiento programado para el sábado 6 de abril de 2024.\n\n${TRAINER_TEXT.slice(TRAINER_TEXT.indexOf('femoral casa'))}`;
     const r = importMany(text);
-    expect(r.results.map((x) => x.routine.name)).toEqual(['Espalda y hombro y abdomen', 'Brazos y abdomen', 'Glúteos', 'Gluteo', 'Femoral', 'Cuádriceps', 'Pierna/cuadriceps']);
+    expect(r.results.map((x) => `${x.routine.name} · ${x.routine.place}`)).toEqual([
+      'Cuadriceps · Gimnasio',
+      'Pierna/cuadriceps · Casa',
+      'Espalda y hombro y abdomen · Gimnasio',
+      'Brazos y abdomen · Gimnasio',
+      'Tren superior · Casa',
+      'Cardio y abdomen · Casa o gimnasio',
+      'Gluteo · Gimnasio',
+      'Gluteo · Casa',
+      'Tren superior (versión 2) · Casa',
+      'Femoral · Casa',
+    ]);
     expect(r.ignored).toHaveLength(2);
-    expect(r.duplicates).toEqual(['Gluteo']);
+    expect(r.duplicates).toEqual(['Femoral']);
     expect(r.results.every((x) => x.unparsed.length === 0)).toBe(true);
   });
   it('interpreta superseries, series de calentamiento, rangos y parámetros', async () => {
     const { trainerRoutines } = await import('./seed');
-    const [espalda, brazos, gluteos] = trainerRoutines();
-    expect(espalda.place).toBe('Gimnasio');
+    const all = trainerRoutines();
+    const espalda = all.find((r) => r.name.startsWith('Espalda'))!;
+    expect(espalda.blocks[0]).toMatchObject({ kind: 'calentamiento', title: 'Calentamiento', rounds: 3 });
+    expect(espalda.blocks[0].exercises.map((e) => e.libKey)).toEqual(['circulos-cadera', 'circulos-brazos', 'saltos-suaves']);
     const warm = espalda.blocks[1];
-    expect(warm.title).toMatch(/Series de calentamiento/);
     expect(warm.rounds).toBe(2);
-    expect(warm.exercises[0].params[0].value).toBe('20');
     expect(warm.exercises[0].review).toMatch(/no indicadas/);
     const a = espalda.blocks[2];
-    expect(a.rounds).toBe(4);
-    expect(a.restBetweenRounds).toBe(60);
-    expect(a.exercises[0]).toMatchObject({ reps: 12, repsMax: 15, restAfter: 0, libKey: 'jalon-pecho' });
+    expect(a).toMatchObject({ rounds: 4, restBetweenRounds: 60 });
+    expect(a.exercises[0]).toMatchObject({ name: 'Reverse Grip Lat Pulldown', reps: 12, repsMax: 15, restAfter: 0, libKey: 'jalon-pecho' });
     expect(a.exercises[0].params[0]).toMatchObject({ value: '30–40', unit: 'lb' });
-    const giro = espalda.blocks.find((b) => b.title.startsWith('E'))!.exercises[0];
-    expect(giro.perSide).toBe('a cada lado');
     const tm = espalda.blocks.find((b) => b.kind === 'cardio')!.exercises[0];
-    expect(tm.seconds).toBe(1200);
     expect(tm.params.find((p) => p.label === 'Velocidad')).toMatchObject({ value: '3–3,5', pending: true });
     expect(tm.params.find((p) => p.label === 'Inclinación')).toMatchObject({ value: 'máxima', pending: true });
-    // «primero 5 minutos en la caminadora»
+    expect(espalda.blocks[espalda.blocks.length - 1]).toMatchObject({ kind: 'enfriamiento', title: 'Enfriamiento' });
+    const cardio = all.find((r) => r.name === 'Cardio y abdomen')!;
+    expect(cardio.blocks[1].exercises.map((e) => e.libKey)).toEqual(['toe-touch-supino', 'crujido-rana', 'escalador', 'palanca-pierna', 'v-ups', 'plancha-antebrazos']);
+    expect(cardio.blocks[2].exercises[0].params.find((p) => p.label === 'Inclinación')?.value).toBe('máxima');
+    const tren = all.find((r) => r.name === 'Tren superior')!;
+    const abs = tren.blocks.find((b) => b.title === 'H · Abs')!;
+    expect(abs).toMatchObject({ kind: 'circuito', rounds: 3, restBetweenExercises: 10, restBetweenRounds: 60 });
+    expect(abs.exercises[0].review).toMatch(/no reconocido/); // knee slide crunch
+    expect(abs.exercises.slice(1).every((e) => !e.review)).toBe(true);
+    const box = all.find((r) => r.name === 'Pierna/cuadriceps')!.blocks.flatMap((b) => b.exercises).find((e) => e.name === 'Box Step-Up')!;
+    expect(box.libKey).toBe('subida-escalon');
+    expect(box.coachNotes).toMatch(/superficie alta/);
+    const brazos = all.find((r) => r.name === 'Brazos y abdomen')!;
     expect(brazos.blocks[0].exercises[0]).toMatchObject({ libKey: 'caminadora', seconds: 300 });
-    expect(brazos.blocks.find((b) => b.exercises.some((e) => e.name === 'Flexiones en banco'))!.exercises[1].review).toMatch(/no reconocido/);
-    // pausas guardadas literalmente
-    const hip = gluteos.blocks.find((b) => b.exercises.some((e) => e.libKey === 'hip-thrust-barra'))!.exercises[0];
-    expect(hip.coachNotes).toMatch(/Pausa de 10 segundos/);
-    expect(gluteos.blocks.find((b) => b.kind === 'cardio')!.exercises[0].params.find((p) => p.label === 'Inclinación')?.value).toBe('máxima');
   });
-  it('se cargan una sola vez sin duplicar', async () => {
-    const { withSeeds } = await import('./seed');
-    const s1 = withSeeds(defaultState());
-    expect(s1.routines).toHaveLength(8);
-    expect(withSeeds(s1).routines).toHaveLength(8);
-    const s2 = withSeeds({ ...s1, seeds: [] });
-    expect(s2.routines).toHaveLength(8);
+  it('reemplaza la versión en español sin duplicar y conserva las editadas', async () => {
+    const { withSeeds, trainerRoutines, TRAINER_DESC } = await import('./seed');
+    const fresh = withSeeds(defaultState());
+    expect(fresh.routines).toHaveLength(10);
+    expect(fresh.routines.some((r) => r.sample)).toBe(false);
+    expect(fresh.routines.some((r) => r.id === fresh.reminders.routineId)).toBe(true);
+    expect(withSeeds(fresh).routines).toHaveLength(10);
+    // instalación anterior con rutinas en español
+    const base = defaultState();
+    const oldGlu = { ...trainerRoutines().find((r) => r.name === 'Gluteo' && r.place === 'Casa')!, name: 'Gluteo', id: 'old1', description: TRAINER_DESC };
+    const oldCua = { ...trainerRoutines()[0], name: 'Cuádriceps', id: 'old2', description: TRAINER_DESC, updatedAt: 'editada' };
+    const prev = { ...base, routines: [...base.routines, oldGlu, oldCua], seeds: ['entrenador-2024'], sessions: [{ id: 's', routineId: 'old1', date: '2026-11-05', time: '', status: 'pendiente' as const, rescheduledFrom: [] }] };
+    const next = withSeeds(prev);
+    expect(next.routines.find((r) => r.id === 'old1')).toBeUndefined();
+    expect(next.routines.find((r) => r.id === 'old2')?.name).toBe('Cuádriceps (español)');
+    expect(next.routines).toHaveLength(11);
+    const ses = next.sessions[0];
+    expect(next.routines.find((r) => r.id === ses.routineId)?.name).toBe('Gluteo');
+  });
+});
+
+describe('Nombres en inglés', () => {
+  it('pone mayúsculas solo a los nombres en inglés', async () => {
+    const { englishTitle } = await import('./importer');
+    expect(englishTitle('Deep squat hold')).toBe('Deep Squat Hold');
+    expect(englishTitle('Supine leg raise on flat bench')).toBe('Supine Leg Raise on Flat Bench');
+    expect(englishTitle('Sentadilla sumo')).toBe('Sentadilla sumo');
+    expect(englishTitle('Flexiones en banco')).toBe('Flexiones en banco');
   });
 });

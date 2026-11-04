@@ -84,10 +84,10 @@ function parseReps(text: string): RepInfo | null {
 
 export function blockKindOf(text: string): BlockKind {
   const t = norm(text);
-  if (/calentamiento|activacion|movilidad/.test(t)) return 'calentamiento';
-  if (/enfriamiento|enfriarse|estiramiento|vuelta a la calma|relajacion/.test(t)) return 'enfriamiento';
-  if (/cardio|caminadora|cinta de correr|bicicleta|eliptica|correr|trote|remo ergometro/.test(t)) return 'cardio';
-  if (/circuito|abdomen|abdominal|core|hiit|tabata/.test(t)) return 'circuito';
+  if (/calentamiento|activacion|movilidad|warm ?-?up/.test(t)) return 'calentamiento';
+  if (/enfriamiento|enfriarse|estiramiento|vuelta a la calma|relajacion|cool ?-?down/.test(t)) return 'enfriamiento';
+  if (/cardio|caminadora|treadmill|cinta de correr|bicicleta|eliptica|correr|trote|remo ergometro/.test(t)) return 'cardio';
+  if (/circuito|abdomen|abdominal|\babs\b|core|hiit|tabata/.test(t)) return 'circuito';
   if (/fuerza|pesas|piernas|gluteo|brazos|espalda|pecho|tren (superior|inferior)/.test(t)) return 'fuerza';
   return 'otro';
 }
@@ -95,10 +95,10 @@ export function blockKindOf(text: string): BlockKind {
 const BULLET_RE = /^\s*(?:[-•*·–]|[a-z][.]|\d+[.)])\s+/i;
 const NUM_HEADER_RE = /^\s*(\d+)[.)]\s+(.+)$/;
 const LETTER_RE = /^\s*([A-Za-z])(\d*)\)\s*(.+)$/;
-const SECTION_RE = /^(calentamiento|enfriamiento|enfriarse|estiramientos?|vuelta a la calma|cardio|abdomen|circuito|fuerza)\s*:?\s*$/;
+const SECTION_RE = /^(calentamiento|warm ?-?up|cool ?-?down|enfriamiento|enfriarse|estiramientos?|vuelta a la calma|cardio|abdomen|circuito|fuerza)\s*:?\s*$/;
 /** Avisos que no forman parte de la rutina (se ignoran). */
 const IGNORE_RE = /^(hola\b.*|.*\bno hiciste\b.*|.*\bte perdiste\b.*|.*\bno realizaste\b.*)$/;
-const GENERIC_BLOCK_NAMES = ['abdomen', 'abdominales', 'circuito', 'core', 'cardio', 'fuerza', 'calentamiento', 'enfriamiento'];
+const GENERIC_BLOCK_NAMES = ['abdomen', 'abdominales', 'abs', 'circuito', 'core', 'cardio', 'fuerza', 'calentamiento', 'enfriamiento'];
 
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 const numEs = (s: string) => s.replace('.', ',');
@@ -109,18 +109,18 @@ export function splitTitle(line: string): { name: string; place: string } {
   const dash = t.split(/\s[—–]\s/);
   if (dash.length > 1) return { name: cap(dash[0].trim()), place: cap(dash.slice(1).join(' — ').trim()) };
   let place = '';
-  const tail = t.match(/\s+(casa o gimnasio|gimnasio o casa|en casa|en el gimnasio|gimnasio|casa)$/i);
+  const tail = t.match(/\s+(casa o gimnasio|casa o gym|gimnasio o casa|gym o casa|en casa|en el gimnasio|gimnasio|gym|casa)$/i);
   if (tail) {
     place = tail[1].replace(/^en (el )?/i, '');
     t = t.slice(0, tail.index).trim();
   } else {
-    const head = t.match(/^(gimnasio|casa)\s+(de\s+)?/i);
+    const head = t.match(/^(gimnasio|gym|casa)\s+(de\s+)?/i);
     if (head && t.length > head[0].length) {
       place = head[1];
       t = t.slice(head[0].length).trim();
     }
   }
-  return { name: cap(t), place: cap(place) };
+  return { name: cap(t), place: cap(place.replace(/\bgym\b/i, 'gimnasio')) };
 }
 
 /** Parámetros: velocidad, inclinación, peso, banda. Devuelve null si la línea no es un parámetro. */
@@ -140,7 +140,7 @@ function parseParamLine(line: string, isMachine: boolean): Param | null {
   m = kv(/^inclinacion\b/);
   if (m) return speedOrIncline(m[0], m[1], false);
   // «elevación máxima» en una caminadora = inclinación
-  if (isMachine && /^elevacion\s+(maxima|minima|\d)/.test(n)) {
+  if (isMachine && /^elevacion\s+(maxima|max|minima|\d)/.test(n)) {
     const p = speedOrIncline('Inclinación', raw.replace(/^elevaci[oó]n\s*/i, ''), false);
     p.note = `${p.note ?? ''} Texto original: «${raw}».`.trim();
     return p;
@@ -166,7 +166,7 @@ function parseParamLine(line: string, isMachine: boolean): Param | null {
 }
 
 function speedOrIncline(label: string, rest: string, isSpeed: boolean): Param {
-  const cleanLabel = cap(label.trim().replace(/[:\s]+$/, '')) || (isSpeed ? 'Velocidad' : 'Inclinación');
+  const cleanLabel = (cap(label.trim().replace(/[:\s]+$/, '')) || (isSpeed ? 'Velocidad' : 'Inclinación')).replace(/^Inclinacion/, 'Inclinación');
   const r = rest.trim().replace(/\.$/, '');
   const quoted = r.match(/[“"«]([^”"»]+)[”"»]/);
   const num = r.match(/^(\d+(?:[.,]\d+)?)(?:\s*(?:\/|-|a|–)\s*(\d+(?:[.,]\d+)?))?\s*(km\/h|kmh|mph|%)?/i);
@@ -184,8 +184,21 @@ function speedOrIncline(label: string, rest: string, isSpeed: boolean): Param {
       note: needsUnit ? 'Elige la unidad (km/h o mph).' : rest2 ? `Indicación original: ${rest2}` : undefined,
     });
   }
-  const value = quoted ? quoted[1] : /m[aá]xim/i.test(r) ? 'máxima' : /m[ií]nim/i.test(r) ? 'mínima' : r;
+  const value = quoted ? quoted[1] : /m[aá]xim|^max\b/i.test(r) ? 'máxima' : /m[ií]nim/i.test(r) ? 'mínima' : r;
   return newParam({ label: cleanLabel, value, unit: '', pending: true, note: 'Dato pendiente de definir por el entrenador (no es un valor numérico).' });
+}
+
+const ES_WORDS = /\b(de|del|con|en|la|el|los|las|y|por|al|sin|una?)\b/i;
+const EN_WORDS =
+  /\b(squat|stretch|hold|hips?|curl|row|raise|press|bridge|lunge|plank|crunch|lever|toe|touch|twist|climber|ups?|circle|skipping|jacks|dip|push|pull|extension|walkouts?|way|deadlift|leg|arm|treadmill|sit|wall|frog|mountain|single|seated|banded|supine|box|step|glute|knee|shoulders?|thrust|abduction|switch|straddle|pike|pathway|cobra|thomas)\b/i;
+const EN_SMALL = new Set(['on', 'with', 'and', 'of', 'to', 'the', 'a']);
+/** «deep squat hold» → «Deep Squat Hold» (solo nombres en inglés; los españoles se dejan igual). */
+export function englishTitle(name: string) {
+  if (/[áéíóúñü]/i.test(name) || ES_WORDS.test(name) || !/^[\w\s'’/-]+$/.test(name) || !EN_WORDS.test(name)) return name;
+  return name
+    .split(' ')
+    .map((w, i) => (i > 0 && EN_SMALL.has(w.toLowerCase()) ? w.toLowerCase() : w.charAt(0).toUpperCase() + w.slice(1)))
+    .join(' ');
 }
 
 function makeExercise(rawName: string, seconds: number | null, rep: RepInfo | null): Exercise {
@@ -196,7 +209,7 @@ function makeExercise(rawName: string, seconds: number | null, rep: RepInfo | nu
     perSide = perSide || side[1].toLowerCase();
     name = name.replace(SIDE_RE, '').replace(/\s+/g, ' ').trim();
   }
-  name = cap(name);
+  name = englishTitle(cap(name));
   const lib = findLib(name);
   const mode: Exercise['mode'] = rep && seconds == null ? 'reps' : 'tiempo';
   const base: Partial<Exercise> = {
@@ -363,7 +376,9 @@ function finalizeRoutine(chunk: string[]): ImportResult {
     }
     if (SECTION_RE.test(n)) {
       titleSet = true;
-      const title = cap(line.replace(/[:.]+$/, '').trim()).replace(/^Enfriarse$/i, 'Enfriamiento');
+      const title = cap(line.replace(/[:.]+$/, '').trim())
+        .replace(/^(Enfriarse|Cool ?-?down)$/i, 'Enfriamiento')
+        .replace(/^Warm ?-?up$/i, 'Calentamiento');
       const ob = block as unknown as WBlock | null;
       if (ob && /^circuito$/.test(n) && ob.exercises.length === 0 && !ob._pending.length) {
         ob.kind = 'circuito';
@@ -474,7 +489,7 @@ function finalizeRoutine(chunk: string[]): ImportResult {
       continue;
     }
 
-    const isMachine = /caminadora|cinta|bicicleta|eliptica/.test(norm(blk._header + ' ' + (pending?.name ?? '') + ' ' + (lastExercise()?.name ?? '')));
+    const isMachine = /caminadora|treadmill|cinta|bicicleta|eliptica/.test(norm(blk._header + ' ' + (pending?.name ?? '') + ' ' + (lastExercise()?.name ?? '')));
     const param = parseParamLine(body, isMachine);
     if (param) {
       const s = curSet();
@@ -571,7 +586,7 @@ export function splitRoutines(text: string): { chunks: string[][]; ignored: stri
   const nonEmpty = clean.map((l, i) => ({ l: l.trim(), i })).filter((x) => x.l);
   const starts: number[] = [];
   nonEmpty.forEach((x, k) => {
-    if (/^calentamiento\s*:?\s*$/i.test(norm(x.l)) && k > 0) {
+    if (/^(calentamiento|warm ?-?up)\s*:?\s*$/i.test(norm(x.l)) && k > 0) {
       const prev = nonEmpty[k - 1];
       const pn = norm(prev.l);
       const isTitle = !BULLET_RE.test(prev.l) && !NUM_HEADER_RE.test(prev.l) && !LETTER_RE.test(prev.l) && parseDuration(pn) == null && !parseReps(pn) && !/\d/.test(pn);
@@ -605,7 +620,10 @@ export function importMany(text: string): ImportManyResult {
       continue;
     }
     seen.add(sig);
-    if (res.routine.blocks.length) results.push(res);
+    if (!res.routine.blocks.length) continue;
+    const same = results.filter((x) => norm(x.routine.name + ' ' + x.routine.place) === norm(res.routine.name + ' ' + res.routine.place)).length;
+    if (same) res.routine.name = `${res.routine.name} (versión ${same + 1})`;
+    results.push(res);
   }
   return { results, ignored, duplicates };
 }

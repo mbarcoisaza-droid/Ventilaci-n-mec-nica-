@@ -6,6 +6,7 @@ import { Thumb } from '../components/Illustration';
 import { Empty, Sheet, Toggle } from '../components/ui';
 import { ExerciseGroups, pendingExerciseCount } from './ExerciseGroups';
 import { fmtDur, fmtShort, todayISO } from '../dates';
+import { spanishName } from '../library';
 import { AppState, BLOCK_ICON, Exercise, Routine, uid } from '../model';
 import { amountText, displayName, estimateSeconds, findIssues, paramText } from '../sequence';
 
@@ -214,6 +215,7 @@ export function RoutineDetail({
                   </span>
                   <span className="ex-txt">
                     <b>{displayName(e, routine.useLowImpact)}</b>
+                    {spanishName(e) && <small className="es-name">{spanishName(e)}</small>}
                     <small>
                       {amountText(e)}
                       {e.params.map((p) => ` · ${p.label}: ${paramText(p)}`).join('')}
