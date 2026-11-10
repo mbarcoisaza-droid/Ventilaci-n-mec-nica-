@@ -10,6 +10,8 @@ import { ManeuversPanel } from './ui/panels/Maneuvers';
 import { PatientPanel } from './ui/panels/Patient';
 import { AsyncPanel } from './ui/panels/Async';
 import { ASYNCHRONIES } from './education/asynchronies';
+import { NO_INTERVENTIONS, applyInterventions, interventionWarnings, type Interventions } from './education/interventions';
+import { InterventionsBar } from './ui/Interventions';
 import { CasesPanel } from './ui/panels/Cases';
 import { TheoryPanel } from './ui/panels/Theory';
 import { ConfigPanel } from './ui/panels/Config';
@@ -146,9 +148,21 @@ export default function App() {
     [ctl],
   );
 
+  // intervenciones clínicas: se aplican sobre el paciente «sin intervenciones» (ivBase)
+  const [iv, setIv] = useState<Interventions>(NO_INTERVENTIONS);
+  const [ivBase, setIvBase] = useState<PatientParams | null>(null);
+  const resetIv = () => {
+    setIv(NO_INTERVENTIONS);
+    setIvBase(null);
+  };
   const apply = useCallback(
     (p: PatientParams, s: VentSettings, warm?: number) => {
-      if (warm) ctl.replace(s, p, {}, warm);
+      if (warm) {
+        // paciente nuevo: las intervenciones previas dejan de aplicar
+        setIv(NO_INTERVENTIONS);
+        setIvBase(null);
+        ctl.replace(s, p, {}, warm);
+      }
       else {
         ctl.sim.setPatient(p);
         ctl.sim.setSettings(s);
@@ -163,6 +177,7 @@ export default function App() {
 
   const loadCase = (c: ClinicalCase, asyncOpt?: { type: string; severity: AsyncSeverity } | null) => {
     setAsyncFocus(null);
+    resetIv();
     const b = buildCase(c);
     let caseAsync = null as null | { type: string; severity: AsyncSeverity };
     if (asyncOpt && asyncOpt.type !== 'none') {
@@ -189,6 +204,7 @@ export default function App() {
 
   const loadRealPatient = (r: CalibrationResult) => {
     setAsyncFocus(null);
+    resetIv();
     ctl.replace(r.settings, r.patient, { initPaco2: r.initPaco2 }, 15);
     setSettingsState(r.settings);
     setPatientState(r.patient);
@@ -216,6 +232,7 @@ export default function App() {
   /** Vuelve a la configuración inicial de la aplicación para empezar otro caso. */
   const newSession = () => {
     setAsyncFocus(null);
+    resetIv();
     ctl.replace(INIT_SETTINGS, INIT_PATIENT, {}, 12);
     setSettingsState(INIT_SETTINGS);
     setPatientState(INIT_PATIENT);
@@ -256,6 +273,17 @@ export default function App() {
   const ineff = sim.drive.efforts.filter((e) => e.onset > sim.t - 60 && e.onset < sim.t - e.ti - 0.3 && !e.triggered && !e.reverse).length;
   if (sim.modeAllowsTrigger && ineff) events.ineffective = ineff;
   const notes = useMemo(() => (explain && level < 3 && !asyncFocusHidden ? interpret(m, settings, g, sim.pbw) : []), [explain, level, m, settings, g, sim.pbw, asyncFocusHidden]);
+
+  const changeIv = (next: Interventions) => {
+    const nx = next.nmb ? { ...next, sedation: 3 as const } : next;
+    const base = ivBase ?? ctl.sim.patient;
+    const none = nx.sedation === 0 && !nx.nmb && nx.fluid === 0;
+    const p = none ? base : applyInterventions(base, nx);
+    ctl.sim.setPatient(p);
+    setPatientState(p);
+    setIv(nx);
+    setIvBase(none ? null : base);
+  };
 
   const pushUndo = () => setUndoStack((u) => [...u.slice(-9), { settings: { ...ctl.sim.settings, alarms: { ...ctl.sim.settings.alarms } }, patient: { ...ctl.sim.patient, effort: { ...ctl.sim.patient.effort } } }]);
   const assist: AssistActions = {
@@ -406,6 +434,7 @@ export default function App() {
         </section>
         <div className="midrow">
         {level === 1 && !asyncFocusHidden && <AsyncBanner ctl={ctl} actions={assist} onOpen={() => setTab('resolver')} />}
+        <InterventionsBar iv={iv} onChange={changeIv} base={ivBase} current={patient} warnings={ivBase ? interventionWarnings(iv, ivBase, settings.mode) : []} />
         {notes.length > 0 && (
           <button className="insight" onClick={() => setTab('lectura')} title="Ver toda la lectura fisiológica">
             <span className="insight-tag">Lectura</span>

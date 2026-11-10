@@ -906,6 +906,9 @@ export class Simulator {
     this.flowMeas = meas;
     this.paw = paw;
     this.dispVol += meas * dt;
+    // corrección de deriva como en los ventiladores: el volumen mostrado no baja de 0 durante la espiración
+    // (p. ej. exhalación de un volumen previo acumulado por esfuerzos o por un cambio de CRF)
+    if (this.dispVol < 0 && (this.phase === 'exp' || this.phase === 'holdE')) this.dispVol = 0;
 
     // acumuladores
     const a = this.acc;
